@@ -1,0 +1,28 @@
+= The Java Timer
+:hardbreaks:
+
+How does the `java.util.concurrent.Timer` class work?
+How does it schedule the tasks that you give it?
+Could you roll out your own implementation, or does it contain something inseparable from the java language itself?
+
+Yes. You can definitely roll out your own! You shouldn't use that in production, but understanding it at a fundamental level will make you feel a like 10x programmer.
+
+NOTE: Since Java 5.0, `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate.
+
+An instance of `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread's goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
+
+It may surprise you that it uses time and timestamps to verify if a task is ready to run.
+On the other side, the clients of `Timer` (i.e. the portions of the code that hold a reference to it) submit tasks to run 1) once with a delay, or 2) multiple times at a given frequency.
+Notice that you can have many clients of `Timer`. Each of which running on a thread - which obviously will be different from the thread the `Timer` creates. The best way to understand the timer is to visualize all these threads interacting through a queue. The client of the `Timer` submit (produce) the tasks, and the *SINGLE* thread of the `Timer` removes (consumes) it and runs it when its time comes. Obviously though, that queue is hidden way from the API.
+
+A corollary to this is that timers are not exact. You can never rely on it to run your task at the *exact* moment that you intend it. That's ok too.
+
+For example, lets say that an instance received 2 tasks to run. The first task should run 5 minutes from now, and the 2nd task 10 minutes from now. If, for whatever reason, that first task takes more than 5 minutes to complete, then, because `Timer` is only backed by a *SINGLE* thread, the 2nd task will only run after the 1st completes, potentially not after exactly 10 minutes. Potentially much later.
+The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
+
+
+
+
+
+
+
