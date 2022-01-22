@@ -3,7 +3,7 @@
 
 How does the `java.util.concurrent.Timer` class work?
 How does it schedule the tasks that you give it?
-Could you roll out your own implementation, or does it contain something inseparable from the java language itself?
+Could you roll out your own implementation, or is it some sort of native concept that ships with the java language itself and cannot be replicated in user code?
 
 Yes. You can definitely roll out your own! You shouldn't use that in production, but understanding it at a fundamental level will make you feel a like 10x programmer.
 
@@ -20,9 +20,62 @@ A corollary to this is that timers are not exact. You can never rely on it to ru
 For example, lets say that an instance received 2 tasks to run. The first task should run 5 minutes from now, and the 2nd task 10 minutes from now. If, for whatever reason, that first task takes more than 5 minutes to complete, then, because `Timer` is only backed by a *SINGLE* thread, the 2nd task will only run after the 1st completes, potentially not after exactly 10 minutes. Potentially much later.
 The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
 
+== Implementing your own
+
+=== Attempt 1 - Naive approach
+
+.TimerTask
+[%collapsible]
+====
+[,scala]
+----
+class MyTimerTask private (val runnable: Runnable, val whenToRun: Long) extends Runnable {
+    override def run(): Unit = runnable.run()
+}
+
+object MyTimerTask {
+    def apply(runnable: Runnable, whenToRun: Long): MyTimerTask = new MyTimerTask(runnable, whenToRun)
+}
+----
+====
 
 
+.Timer
+[%collapsible]
+====
+[,scala]
+----
+import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 
+class MyTimer private (queue: BlockingQueue) {
+  def schedule(runnable: Runnable, delay: Long): Unit =
+    queue.put(MyTimerTask(runnable, System.currentTimeMillis() + delay))
+}
 
+object MyTimer {
+  def apply(): MyTimerImpl = {
+    val queue = new LinkedBlockingQueue[MyTimerTask]()
 
+    val timerThread = new Thread(new Runnable {
+      override def run(): Unit = while (true) {
+        val newElement = queue.take()
+        if (System.currentTimeMillis() > newElement.whenToRun) newElement.run()
+        else queue.put(MyTimerTask(newElement.runnable, newElement.whenToRun))
+      }
+    })
+    timerThread.setName("TimerThread")
+    timerThread.setDaemon(false)
+    timerThread.start()
+    new MyTimerImpl(queue)
+  }
+}
+----
+====
 
+An advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread on a "waiting" state until a 2nd thread pushes a new element/task to it.
+
+A major disadvantage is that the timer thread will "spin" - and therefore waste CPU time - until the next task has to be run. If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around. This is wasteful of CPU if during this 30 minutes there are no new tasks submitted.
+
+What you would like the thread to do:
+- To be de-scheduled if there are no tasks, and wake up once one is submitted.
+- To be de-scheduled **UNTIL** the next task is to be run, **OR UNTIL** a new task is submitted in the meantime, such that it is to be run before the former.
