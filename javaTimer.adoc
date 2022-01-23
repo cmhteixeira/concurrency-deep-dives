@@ -74,8 +74,31 @@ object MyTimer {
 
 An advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread on a "waiting" state until a 2nd thread pushes a new element/task to it.
 
-A major disadvantage is that the timer thread will "spin" - and therefore waste CPU time - until the next task has to be run. If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around. This is wasteful of CPU if during this 30 minutes there are no new tasks submitted.
+A disadvantage is that the timer thread will "spin" - and therefore waste CPU time - until the next task has to be run. If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around. This is wasteful of CPU if during this 30 minutes there are no new tasks submitted.
 
 What you would like the thread to do:
 - To be de-scheduled if there are no tasks, and wake up once one is submitted.
 - To be de-scheduled **UNTIL** the next task is to be run, **OR UNTIL** a new task is submitted in the meantime, such that it is to be run before the former.
+
+This is what `Timer` does. The diagram shows what the timer thread is doing for the code at [1]:
+
+.Thread states of the thread of a `java.util.concurrent.Timer`.
+image::./images/TimerThreadLane.svg[]
+
+The timer (and therefore associated thread) is created at around time 0, and immediately after two tasks are submitted. Task 1, schedule to run 30 seconds from now and Task 2, schedule to run 90 seconds from now. Both tasks are just a while loop for 20 seconds.
+
+**Importantly note**
+1. For the 1st 30 seconds, there is nothing to do. Adequately the thread sleeps and does not wast CPU. "It knows" exactly when to wake back up.
+2. After it runs, it goes back to idle until Task 2 is meant to run.
+3. After running Task 2, as there are no more tasks submitted, it correctly goes bak to a "Waiting state".
+
+Question
+What would happen if a third task was submitted **at** 60 seconds, when the timer thread was waiting to run Task 2, and such task having a scheduled time of 10 seconds (meaning, it should run at time 70 seconds)?
+
+Well, the `java.util.concurrent.Timer` correctly wakes up prematurely, and is able to run Task 3 **before** Task 2:
+
+
+.Thread states of the thread of a `java.util.concurrent.Timer`.
+image::./images/TimerThreadLane-ExtraTask.svg[]
+
+But wait, there is more. Notice dashed line at 60 seconds, when Task 3 is introduced? Well, if we were to zoom-in, we would notice that the thread wakes up for a very brief period of time In the order of microseconds. This is necessary off course to verify when the ew Task 3 has to be run and take appropriate action.
