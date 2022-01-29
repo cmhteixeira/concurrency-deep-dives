@@ -102,3 +102,12 @@ Well, the `java.util.concurrent.Timer` correctly wakes up prematurely, and is ab
 image::./images/TimerThreadLane-ExtraTask.svg[]
 
 But wait, there is more. Notice dashed line at 60 seconds, when Task 3 is introduced? Well, if we were to zoom-in, we would notice that the thread wakes up for a very brief period of time In the order of microseconds. This is necessary off course to verify when the ew Task 3 has to be run and take appropriate action.
+
+
+==== Another part
+Because Timer has only one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.
+
+
+image::./images/TimerThreadLane_DelayedTask.svg[]
+
+The `ScheduledThreadPoolExecutor` lessens this problem by having multiple threads that can pick up tasks. __Lessens__ is the appropriate word, as the problem is not fully solved. If more tasks than threads are submitted, **and** each of these takes longer to run than the next is due, this task will be late.
