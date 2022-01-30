@@ -20,6 +20,12 @@ A corollary to this is that timers are not exact. You can never rely on it to ru
 For example, lets say that an instance received 2 tasks to run. The first task should run 5 minutes from now, and the 2nd task 10 minutes from now. If, for whatever reason, that first task takes more than 5 minutes to complete, then, because `Timer` is only backed by a *SINGLE* thread, the 2nd task will only run after the 1st completes, potentially not after exactly 10 minutes. Potentially much later.
 The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
 
+=== Overview
+
+image::./images/Overview.svg[]
+
+
+
 == Implementing your own
 
 === Attempt 1 - Naive approach
