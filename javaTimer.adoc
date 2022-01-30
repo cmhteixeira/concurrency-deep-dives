@@ -1,13 +1,29 @@
 = The Java Timer
 :hardbreaks:
 
-How does the `java.util.concurrent.Timer` class work?
-How does it schedule the tasks that you give it?
-Could you roll out your own implementation, or is it some sort of native concept that ships with the java language itself and cannot be replicated in user code?
+Here I want to study the `java.util.concurrent.Timer` class (henceforth just `Timer`) and distill it to fundamentals. I want to answer the questions:
+
+* How does it essentially work?
+//* How does it schedule the tasks that you give it?
+* What concurrency mechanisms does it use?
+* Could you roll out your own implementation, or is it some sort of native concept that ships with the java language itself and cannot be replicated in user code?
+
 
 Yes. You can definitely roll out your own! You shouldn't use that in production, but understanding it at a fundamental level will make you feel a like 10x programmer.
 
-NOTE: Since Java 5.0, `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate.
+.Summary - TL;DR
+* Every `Timer` that is instantiated starts a thread. A [.underline]#single# new thread.
+** The thread is essentially a `while(true)` loop over a queue of tasks.
+** The thread is responsible for both running the tasks, and deciding when to run the next task.
+* The [.underline]#native# method `wait(<timeout>)` - present on every Java object - is the mechanism by which the thread can sleep until the next task is due.
+** Correspondingly, the [.underline]#native#  method `notifyAll()` is the mechanism by which the thread can be "waken up, if during its sleep," a new task is submitted that ought to run sooner.
+
+
+NOTE: Since Java 5.0, `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate. Another advantage of `ScheduledThreadPoolExecutor` is that it is an interface whilst `Timer` is a concrete class. Testing your own class is much easier when you depend on an interface and inject a dummy implementation of `ScheduledThreadPoolExecutor`. With `Timer`, that is much harder.
+
+
+We can begin by thinking what is the purpose of a `Timer`? Well, it is to receive and manage tasks with deferred and/or periodic execution. Given an instance, you want to give it a task "to run 1 minute from now", or "every 30 seconds."
+
 
 An instance of `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread's goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
 
@@ -117,3 +133,14 @@ Because Timer has only one thread, if a task takes to long, the remaining tasks 
 image::./images/TimerThreadLane_DelayedTask.svg[]
 
 The `ScheduledThreadPoolExecutor` lessens this problem by having multiple threads that can pick up tasks. __Lessens__ is the appropriate word, as the problem is not fully solved. If more tasks than threads are submitted, **and** each of these takes longer to run than the next is due, this task will be late.
+
+This shortcoming is why `Timer` (and similarly for `ScheduledThreadPoolExecutor`) has two similar methods for scheduling periodic tasks:
+
+* `schedule(<task>, <delay>, <period>)`, and
+* `scheduleAtFixedRate(<task>, <delay>, <period>)`.
+
+For the first, the `period` represents the time that should elapse between the execution of each task.
+For the second, the `period` represents the frequency (e.g. rate) at which the task should run.
+After some minutes of thinking, you will conclude that these two concepts are **not** equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run a task every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the 2nd case it runs 60 times to keep up.
+
+While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of `Timer`. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.
