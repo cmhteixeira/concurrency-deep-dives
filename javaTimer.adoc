@@ -18,14 +18,20 @@ Yes. You can definitely roll out your own! You shouldn't use that in production,
 * The [.underline]#native# method `wait(<timeout>)` - present on every Java object - is the mechanism by which the thread can sleep until the next task is due.
 ** Correspondingly, the [.underline]#native#  method `notifyAll()` is the mechanism by which the thread can be "waken up, if during its sleep," a new task is submitted that ought to run sooner.
 
+== The MVP of a `Timer`
+
+We can begin by thinking what is the purpose of `Timer`? Well, it is to receive and manage tasks with deferred and/or periodic execution. Given an instance, you want to give it a task "to run 1 minute from now", or "every 30 seconds."
+
+These tasks need to run on threads, these being the basic unit to "run things". It also doesn't make much sense to run these tasks on the same thread that submits the task. Or else the thread would have to stop whatever it was doing to focus on running the task, which doesn't seem useful. The question is then if we should have a single thread, multiple threads, or some kind of thread pool. Regardless, this is enough to realize that we need some kind of data structure by means of which the thread that submits the task, can actually pass the task to the thread(s) that run it.
+
+The most basic form of a timer is therefore a lonely thread whose sole purpose is to loop over some data structure that contains tasks to run. Evidently, that data structure is shared with the other "producer" threads which have a reference to the timer and that submit the tasks. The latter are like clients of the timer.
+The diagram below is appropriate representation:
+
+image::./images/Overview.svg[]
+
+It turns out, the `Timer` class is very much well represented in the above diagram. In particular, a `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread's goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
 
 NOTE: Since Java 5.0, `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate. Another advantage of `ScheduledThreadPoolExecutor` is that it is an interface whilst `Timer` is a concrete class. Testing your own class is much easier when you depend on an interface and inject a dummy implementation of `ScheduledThreadPoolExecutor`. With `Timer`, that is much harder.
-
-
-We can begin by thinking what is the purpose of a `Timer`? Well, it is to receive and manage tasks with deferred and/or periodic execution. Given an instance, you want to give it a task "to run 1 minute from now", or "every 30 seconds."
-
-
-An instance of `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread's goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
 
 It may surprise you that it uses time and timestamps to verify if a task is ready to run.
 On the other side, the clients of `Timer` (i.e. the portions of the code that hold a reference to it) submit tasks to run 1) once with a delay, or 2) multiple times at a given frequency.
@@ -38,7 +44,7 @@ The documentation itself warns about this. You should avoid long computations fo
 
 === Overview
 
-image::./images/Overview.svg[]
+
 
 
 
