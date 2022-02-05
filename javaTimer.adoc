@@ -1,116 +1,215 @@
 = The Java Timer
+:source-highlighter: highlight.js
+:highlightjs-languages: scala
 :hardbreaks:
 
-Here I want to study the `java.util.concurrent.Timer` class (henceforth just `Timer`) and distill it to fundamentals. I want to answer the questions:
+Here I want to study the `java.util.Timer` class (henceforth just `Timer`) and distill it to its fundamentals. I want to answer:
 
 * How does it essentially work?
-//* How does it schedule the tasks that you give it?
 * What concurrency mechanisms does it use?
 * Could you roll out your own implementation, or is it some sort of native concept that ships with the java language itself and cannot be replicated in user code?
 
 
-Yes. You can definitely roll out your own! You shouldn't use that in production, but understanding it at a fundamental level will make you feel a like 10x programmer.
+Yes. You can definitely roll out your own! Like all things concurrency, you shouldn't use your own implementation in production, but actually being able to do develop one from scratch makes you feel incredibly competent, reduces the angst of using concepts like a black-box, and guides your judgement when you do use external code that deals with this for you.
 
-.Summary - TL;DR
+
+.Summary - TLDR
 * Every `Timer` that is instantiated starts a thread. A [.underline]#single# new thread.
 ** The thread is essentially a `while(true)` loop over a queue of tasks.
 ** The thread is responsible for both running the tasks, and deciding when to run the next task.
 * The [.underline]#native# method `wait(<timeout>)` - present on every Java object - is the mechanism by which the thread can sleep until the next task is due.
-** Correspondingly, the [.underline]#native#  method `notifyAll()` is the mechanism by which the thread can be "waken up, if during its sleep," a new task is submitted that ought to run sooner.
+** Correspondingly, the [.underline]#native#  method `notify()` is the mechanism by which the thread can be "waken up, if during its sleep," a new task is submitted that ought to run sooner.
 
 == The MVP of a `Timer`
 
-We can begin by thinking what is the purpose of `Timer`? Well, it is to receive and manage tasks with deferred and/or periodic execution. Given an instance, you want to give it a task "to run 1 minute from now", or "every 30 seconds."
+The purpose of a timer is to receive and manage tasks with deferred and/or periodic execution. Given an instance, you want to give it a task "to run 1 minute from now", or "every 30 seconds."
 
 These tasks need to run on threads, these being the basic unit to "run things". It also doesn't make much sense to run these tasks on the same thread that submits the task. Or else the thread would have to stop whatever it was doing to focus on running the task, which doesn't seem useful. The question is then if we should have a single thread, multiple threads, or some kind of thread pool. Regardless, this is enough to realize that we need some kind of data structure by means of which the thread that submits the task, can actually pass the task to the thread(s) that run it.
 
-The most basic form of a timer is therefore a lonely thread whose sole purpose is to loop over some data structure that contains tasks to run. Evidently, that data structure is shared with the other "producer" threads which have a reference to the timer and that submit the tasks. The latter are like clients of the timer.
-The diagram below is appropriate representation:
+The most basic form of a timer is therefore a lonely thread whose sole purpose is to loop over some data structure that contains tasks to run. Evidently, that data structure is shared with the other "producer" threads which have a reference to the timer and that submit the tasks. The latter are like clients of the timer:
+//The best way to understand the timer is to visualize all these threads interacting through a queue. The client of the `Timer` submit (produce) the tasks, and the *SINGLE* thread of the `Timer` removes (consumes) it and runs it when its time comes. Obviously though, that queue is hidden way from the API.
 
+.High-level representation of how a timer works internally.
 image::./images/Overview.svg[]
 
-It turns out, the `Timer` class is very much well represented in the above diagram. In particular, a `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread's goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
+It turns out, the `Timer` class is very much well represented in the above diagram. In particular, a `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
 
-NOTE: Since Java 5.0, `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate. Another advantage of `ScheduledThreadPoolExecutor` is that it is an interface whilst `Timer` is a concrete class. Testing your own class is much easier when you depend on an interface and inject a dummy implementation of `ScheduledThreadPoolExecutor`. With `Timer`, that is much harder.
+[NOTE]
+====
+Since Java 5.0 (2004), `Timer` went out of favor with the introduction of `java.util.concurrent.ScheduledThreadPoolExecutor`. The latter is more versatile, but unless you need its extra-capabilities, `Timer` is more than adequate. For example, `ScheduledThreadPoolExecutor` is an interface rather than a concrete class, with all the advantages that brings.
+====
 
-It may surprise you that it uses time and timestamps to verify if a task is ready to run.
-On the other side, the clients of `Timer` (i.e. the portions of the code that hold a reference to it) submit tasks to run 1) once with a delay, or 2) multiple times at a given frequency.
-Notice that you can have many clients of `Timer`. Each of which running on a thread - which obviously will be different from the thread the `Timer` creates. The best way to understand the timer is to visualize all these threads interacting through a queue. The client of the `Timer` submit (produce) the tasks, and the *SINGLE* thread of the `Timer` removes (consumes) it and runs it when its time comes. Obviously though, that queue is hidden way from the API.
+Notice in particular you can have many clients of a `Timer`. That is, many parts of your code base with a reference to the same object. Each may submit tasks, and be running on a different thread. This demands the "shared data structure" be thread-safe.
 
-A corollary to this is that timers are not exact. You can never rely on it to run your task at the *exact* moment that you intend it. That's ok too.
+//It may surprise you that it uses time and timestamps to verify if a task is ready to run.
+//On the other side, the clients of `Timer` (i.e. the portions of the code that hold a reference to it) submit tasks to run 1) once with a delay, or 2) multiple times at a given frequency.
 
-For example, lets say that an instance received 2 tasks to run. The first task should run 5 minutes from now, and the 2nd task 10 minutes from now. If, for whatever reason, that first task takes more than 5 minutes to complete, then, because `Timer` is only backed by a *SINGLE* thread, the 2nd task will only run after the 1st completes, potentially not after exactly 10 minutes. Potentially much later.
-The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
+//A corollary to this is that timers are not exact. You can never rely on it to run your task at the *exact* moment that you intend it. That's ok too.
 
-=== Overview
-
-
-
+//For example, lets say that an instance received 2 tasks to run. The first task should run 5 minutes from now, and the 2nd task 10 minutes from now. If, for whatever reason, that first task takes more than 5 minutes to complete, then, because `Timer` is only backed by a *SINGLE* thread, the 2nd task will only run after the 1st completes, potentially not after exactly 10 minutes. Potentially much later.
+//The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
 
 
 == Implementing your own
 
+There are 4 public methods.
+
+.Timer API
+====
+[source,java]
+----
+public class Timer {
+    public void schedule(TimerTask task, long delay) {/* impl */}
+    public void schedule(TimerTask task, long delay, long period) {/* impl */}
+    public void scheduleAtFixedRate(TimerTask task, long delay, long period) {/* impl */}
+    public void cancel() {/* impl */}
+}
+----
+====
+
+These methods are what the client threads are allowed to call. As a sidenote, notice that the client has no direct control over the underlying "shared data structure" or thread. These were set up "under the hood" upon object creation of the `Timer` instance. By the time a client calls any of these methods, the timer thread is already doing its business: looping around the "shared data structure", eager for tasks to run.
+
+The two methods with the `period` parameter are for **periodic** tasks. The difference between will be explained later.
+We will focus on the first method. It's the simplest, but still requires us to address the fundamentals of the challenge that underpins timers: How to schedule the tasks.  It's here where we lift the veil of magic. The other two scheduling methods introduce no fundamental new challenge. `cancel()` is also important.
+
+`TimerTask` above is a concept which exists for the purpose of `Timer`. It is essentially a `Runnable`. Lets not dwell too much on it. Not overly relevant to the core understanding.
+
 === Attempt 1 - Naive approach
 
-.TimerTask
+We need the following:
+1. Thread safe data structure.
+2. One thread looping over that data structure endlessly.
+
+(We will follow with Scala source code. The syntax is different, but in practise its the same thing)
+
+.Attempt 1 - Naive approach
 [%collapsible]
 ====
-[,scala]
-----
-class MyTimerTask private (val runnable: Runnable, val whenToRun: Long) extends Runnable {
-    override def run(): Unit = runnable.run()
-}
-
-object MyTimerTask {
-    def apply(runnable: Runnable, whenToRun: Long): MyTimerTask = new MyTimerTask(runnable, whenToRun)
-}
-----
-====
-
-
-.Timer
-[%collapsible]
-====
-[,scala]
+[source,scala]
 ----
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 
-class MyTimer private (queue: BlockingQueue) {
-  def schedule(runnable: Runnable, delay: Long): Unit =
-    queue.put(MyTimerTask(runnable, System.currentTimeMillis() + delay))
+class CustomTimer private (queue: BlockingQueue[(Runnable, Long)]) {
+  def schedule(runnable: Runnable, delay: Long): Unit = {
+    val task = (runnable, System.currentTimeMillis() + delay)
+    queue.put(task)
+  }
 }
 
-object MyTimer {
-  def apply(): MyTimerImpl = {
-    val queue = new LinkedBlockingQueue[MyTimerTask]()
+object CustomTimer {
 
-    val timerThread = new Thread(new Runnable {
-      override def run(): Unit = while (true) {
-        val newElement = queue.take()
-        if (System.currentTimeMillis() > newElement.whenToRun) newElement.run()
-        else queue.put(MyTimerTask(newElement.runnable, newElement.whenToRun))
+  def apply(threadName: String): CustomTimer = {
+    val queue = new LinkedBlockingQueue[(Runnable, Long)]()
+
+    def mainLoop(): Unit =
+      while (true) {
+        val tuple @ (runnableTask, whenToRun) = queue.take()
+        if (System.currentTimeMillis() > whenToRun) runnableTask.run()
+        else queue.put(tuple)
       }
-    })
-    timerThread.setName("TimerThread")
+
+    val timerThread = new Thread(new Runnable { def run(): Unit = mainLoop() })
+    timerThread.setName(threadName)
     timerThread.setDaemon(false)
     timerThread.start()
-    new MyTimerImpl(queue)
+    new CustomTimer(queue)
   }
 }
 ----
 ====
 
-An advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread on a "waiting" state until a 2nd thread pushes a new element/task to it.
+Hopefully I didn't disappoint in leveraging the existing `BlockingQueue/LinkedBlockingQueue`. Developing one from scratch would be very instructive, but this is a beast on its own.
 
-A disadvantage is that the timer thread will "spin" - and therefore waste CPU time - until the next task has to be run. If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around. This is wasteful of CPU if during this 30 minutes there are no new tasks submitted.
+For all its cons, an advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread calling `queue.take` on a "waiting" state until a timer client pushes a new element/task to the queue.
 
-What you would like the thread to do:
-- To be de-scheduled if there are no tasks, and wake up once one is submitted.
-- To be de-scheduled **UNTIL** the next task is to be run, **OR UNTIL** a new task is submitted in the meantime, such that it is to be run before the former.
+We can see that by profiling the thread state:
 
-This is what `Timer` does. The diagram shows what the timer thread is doing for the code at [1]:
+.spin method. Useful for tests. Used throughout.
+[%collapsible]
+====
+[source,scala]
+----
+import scala.concurrent.duration._
 
-.Thread states of the thread of a `java.util.concurrent.Timer`.
+def spin(duration: Duration): Unit = {
+  val stopSpinning = System.currentTimeMillis() + duration.toMillis
+  while (System.currentTimeMillis() < stopSpinning) {}
+}
+----
+====
+
+.Thread "sleeps" when queue is empty
+[#threadSleepsWhenQueueEmpty]
+[%collapsible]
+====
+[source,scala]
+----
+import scala.concurrent.duration._
+
+object SomeTests extends App {
+  val customTimer = CustomTimer("FooBarThread") // <1>
+
+  spin(1.minute) // <2>
+
+  customTimer.schedule(
+    new Runnable { def run(): Unit = spin(20.seconds) },
+    30.second.toMillis
+  )
+
+}
+----
+
+<1> By the time this constructor returns, the timer thread is already up and running.
+<2> Note, this call happens on the main thread, which is different from the timer thread.
+====
+
+.States of the timer thread for the listing <<threadSleepsWhenQueueEmpty, above>>. No tasks on the queue, means the thread will be in a waiting state, whereby the CPU will not run it.
+image::./images/TimerThreadLane-Attempt1.svg[]
+
+Are you surprised of the usage of `System.currentTimeMillis()` to help schedule the tasks? Don't be. `Timer` uses the exact same mechanism.
+
+The biggest disadvantage of this attempt is that when there are pending tasks (i.e. the queue is not empty) the timer thread is needlessly active. The thread will be assigned CPU time, although nothing  of value is running until the next task has to be run: If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around.
+
+
+There is an implicit requirement:
+****
+The timer thread should not waste CPU time **UNTIL** the next task is scheduled to run.
+****
+
+This is indeed what `Timer` does. The diagram shows what the timer thread is doing for the code at [1]:
+
+.Scheduling of two tasks
+[#twoTasksScheduled]
+[%collapsible]
+====
+[source,scala]
+----
+
+import java.util.{Timer, TimerTask}
+import scala.concurrent.duration._
+
+object SomeTests extends App {
+
+  val javaTimer = new Timer("FooBarTimer") // <1>
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(20.second) },
+    30.second.toMillis
+  )
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(20.second) },
+    90.second.toMillis
+  )
+}
+
+----
+
+<1> By the time this constructor returns, the timer thread is already up and running.
+====
+
+.States of the thread of a `java.util.Timer` for the listing <<twoTasksScheduled, above>>.
+[#javaTimerTwoTasksScheduled]
 image::./images/TimerThreadLane.svg[]
 
 The timer (and therefore associated thread) is created at around time 0, and immediately after two tasks are submitted. Task 1, schedule to run 30 seconds from now and Task 2, schedule to run 90 seconds from now. Both tasks are just a while loop for 20 seconds.
@@ -120,33 +219,600 @@ The timer (and therefore associated thread) is created at around time 0, and imm
 2. After it runs, it goes back to idle until Task 2 is meant to run.
 3. After running Task 2, as there are no more tasks submitted, it correctly goes bak to a "Waiting state".
 
-Question
-What would happen if a third task was submitted **at** 60 seconds, when the timer thread was waiting to run Task 2, and such task having a scheduled time of 10 seconds (meaning, it should run at time 70 seconds)?
+=== Attempt 2
 
-Well, the `java.util.concurrent.Timer` correctly wakes up prematurely, and is able to run Task 3 **before** Task 2:
+We could improve our custom <<Attempt 1 - Naive approach>>, by calling `Thread.sleep(<duration>)`, where `duration` would be the time interval until the next task is meant to run. That is, on each iteration we take the task which should run next, and then put the thread to sleep until it should run. when it wakes, the thread then runs it, and moves on to the next iteration.
+The problem is we would miss-schedule tasks the clients submit *after* the timer thread goes to the sleep state. Is there a mechanism for the thread sleeping after `Thread.sleep()` to woken up?
+// talk about Thread.interruption.
 
+In other words, the question is:
 
-.Thread states of the thread of a `java.util.concurrent.Timer`.
+Relative to the previous <<javaTimerTwoTasksScheduled, scenario>>, what would happen if some client - on a different thread - submitted a task **at** 60 seconds, when the timer thread was waiting to run Task 2, and such that this new task has a scheduled time of 10 seconds (meaning, it should run at time 70 seconds)?
+
+Sadly, in our purposed approach with `Thread.sleep()`, the timer would run Task 3 at best at 90 seconds, once it awakens.
+
+By contrast, the `Timer` correctly wakes up prematurely, and is able to run Task 3 **before** Task 2:
+
+.Submitting a task due sooner
+[#submitNewTaskWhenThreadIsWaitingForAnother]
+[%collapsible]
+====
+[source,scala]
+----
+
+import java.util.{Timer, TimerTask}
+import scala.concurrent.duration._
+
+object SomeTests extends App {
+
+  val javaTimer = new Timer("FooBarTimer") // <1>
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(20.second) },
+    30.second.toMillis
+  )
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(20.second) },
+    90.second.toMillis
+  )
+
+  spin(60.seconds) // <2>
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(10.second) },
+    10.second.toMillis
+  )
+}
+
+----
+<1> By the time this constructor returns, the timer thread is already up and running.
+<2> Notice that this is the main thread, the only "client" of the `Timer` instance.
+====
+
+.States of the timer thread of a `java.util.Timer` for the listing <<submitNewTaskWhenThreadIsWaitingForAnother, above>>.
 image::./images/TimerThreadLane-ExtraTask.svg[]
 
 But wait, there is more. Notice dashed line at 60 seconds, when Task 3 is introduced? Well, if we were to zoom-in, we would notice that the thread wakes up for a very brief period of time In the order of microseconds. This is necessary off course to verify when the ew Task 3 has to be run and take appropriate action.
 
 
-==== Another part
-Because Timer has only one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.
+This seems rather magical. The timer thread, which is effectively not running when Task 3 is submitted, wakes up as a result of the submission and then 1) processes the new task, 2) understands it should run earlier than Task 2, and then 3) goes back to sleep until is due date.
+
+This is off course what you would intuitively expect. We should augment the previous requirement.
+
+****
+The timer thread should not waste CPU time **UNTIL** the next task is scheduled to run, **OR UNTIL** a new task is submitted in the meantime, such that it is to be run before the former.
+****
+
+This is where the buck stops, at least for the java programmer.
+It is here that we meet the interface between our source code (be it Java/Scala/Kotlin) and the underlying system (JVM, OS, Hardware) occurs.
+The same way you ultimately need the JVM to have antive code to handle the file system, or network calls for us, here we must also rely on the JVM to be able to do funny things with thread scheduling.
+In turn, the JVM will call the underlying OS for this, give that threads as a concept of the OS.
+
+What is exposed by the JVM is the concept of the native methods `wait()`, `wait(<timeout>)`, `notify()`, and `notifyAll()`.
+Most likely, some of the people reading already know these.These exist on every Java object, and are the bedrock to for all concurrent things on the JVM. In this article, we won't be exploring these methods - although that would be VERY interesting. Let's just take them as dogma.
+
+With them, I am able to meet the requirement above.
+
+.A serious solution
+[#firstSeriousSolution]
+[%collapsible]
+====
+[source,scala]
+----
+
+import java.util.Comparator
+import java.util.concurrent.{BlockingQueue, PriorityBlockingQueue}
+
+class CustomTimer private (lock: Object, queue: BlockingQueue[(Runnable, Long)]) {
+  def schedule(runnable: Runnable, delay: Long): Unit = {
+    val thisTask = (runnable, System.currentTimeMillis() + delay)
+    queue.put(thisTask)
+    if (queue.peek() == thisTask) {
+      lock.synchronized {
+        lock.notify() // <1>
+      }
+    }
+  }
+}
+
+object CustomTimer {
+
+  private def comparator: Comparator[(Runnable, Long)] =  // <2>
+    new Comparator[(Runnable, Long)] {
+      def compare(o1: (Runnable, Long), o2: (Runnable, Long)): Int =
+        (o1._2 - o2._2).toInt
+    }
+
+  def apply(threadName: String): CustomTimer = {
+    val lock: Object = new Object()
+    val queue = new PriorityBlockingQueue[(Runnable, Long)](10, comparator)
+
+    def mainLoop(): Unit =
+      while (true) {
+        val tuple @ (runnableTask, whenToRun) = queue.take()
+        val timeToWait = whenToRun - System.currentTimeMillis()
+        if (timeToWait <= 0) runnableTask.run()
+        else {
+          lock.synchronized {
+            lock.wait(timeToWait) // <1>
+          }
+          queue.offer(tuple)
+        }
+      }
+
+    val timerThread = new Thread(new Runnable { def run(): Unit = mainLoop() })
+    timerThread.setName(threadName)
+    timerThread.setDaemon(false)
+    timerThread.start()
+    new CustomTimer(lock, queue)
+  }
+}
+
+----
+<1> They dance together
+<2> The `PriorityBlockingQueue` needs this to be able to sort the elements by priority.
+====
 
 
+The `lock.notify()` and `lock.wait(<timeout>)` play the dance together.
+The timer thread takes the next task to run.
+The `lock.wait(<timeout>)` puts the timer thread in a waiting state - what we want. it solves *both* problems. It will wake up either when the timeout expires, or when some other thread calls `notify()` (or `notifyAll()`) on that same object `lock`.
+
+Lets see how this solution deals with example (example). Lets make the starting point when the timer thread is executing Task 1. At that moment, Task 2 is already on the queue, but Task 3 isn't.
+Once the timer thread finishes, it begins another iteration of the loop. It removes Task 2 (at that point the only task left) and falls into the `else` branch. It enter the `synchronized` block and calls the wait method with timeout `90s-50s=30s`. At this point the timer thread goes into the waiting state. It is being scheduled by the OS. At same point later, but before those 30 seconds go by, the timer thread is still asleep when a client, on another thread, submits a new task. Because this new task is next task to run (being it the only one on the queue), the `schedule` method will enter the `if` block. There, it acquires the lock. This is alright, becuase the timer thread relishendit the lock once it called `wait(30s)`. Immedtiatly after, it calls `lock.notify()`. This has the power to wake up the our timer thread. Recall that by the semantics of `Object.wait()`, the thread wakes up when the timeout expires where when some other thread calls `notify`.
+After the timer thread wakens, the objective is to check **which** is the new task to run. There are two options. The original task (Task 2), or the new task inserted by the client (Task 3).
+To that end, after the timer thread awakens, it continues where it left off. After exiting the synchronized block, it inserts the Task 2 back into the shared queue, and then starts another loop iteration. At the point it takes an element from the queue, both tasks Task 2 and Task 3 will be present there. The one taken is the shorter of the 2. Recall that the responsability of sorting the queue correctly was deferred to the `java.util.concurrent.PriorityBlockingQueue` (for convenience. We can do that ourselves). Because of this, Task 3 will be the one removed from the queue. Still, it is not yet time for the task to run. So we go again onto the `else` branch and call `lock.wait(10.s)`. Because there are no more clients submitting tasks, there is no more calls to `lock.notify()`, and the only way for the timer thread to wake up is when the timeout expires.
+After it wakes up, it should run the task. For the purposes of this example, we isntead offer it back to the queue. That's fine, because the thread noe begins another iteration of the loop, and it will take the same Task 3 again. By then `timeToWait` will be negative and finally Task 3 is run. After Task 3 completes, we are back again on a new iteration. By now, only Task 2 remains on the queue. On take it, and the process repeats itself.
+
+Notice that, if clients schedule new tasks which are not inserted at the ehad of the preiority queue, then the timer thread will not be awaken (in case it was waiting).
+
+==== A bug
+
+The previously solution has a race condition. Its not a big bug. The solution is still very decent. But probably you wouldn't want to use it in production. Well, but that is already an assumption on everything we have been doing. Do you want to try to identify the race condition?
+
+=== Cancellation
+
+Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is underrated. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.
+
+What do we mean by cancellation? We want the timer to stop running tasks, and for the associated resources to be released, which will mean at least the timer thread terminates. We also want the cancellation to be reliable, predictable, safe. Well, that goes without saying. What those things mean in this context however, is still to be determined.
+
+When a client asks for cancellation, the system might be in four major states.
+
+1. One task is running, but no more tasks are scheduled.
+2. One is running, and additional tasks are scheduled.
+3. No task running, and no more tasks scheduled.
+4. No task running, but some tasks scheduled.
+
+.Revisiting the high-level representation. Plus cancellation.
+image::./images/OverviewWithCancellation.svg[]
+
+This raises questions.
+
+1. Do we try to cancel an actively running task?
+    - Is it even possible to cancel an actively running task?
+2. If we let it run, do we also run the additional tasks on the queue?
+3. If yes, do we allow new tasks to be submitted if they are scheduled to run before the last one? (The last one being the latest task at the time of the cancellation request)
+
+Starting in reverse order. On question 3, the answer is *no*. For `Timer` and also for  `ScheduledExecutorService`. Once cancellation is requested, no more tasks can be added. Any further submissions result in an exception. We will follow that as well.
+
+For question 2, that is up for debate. What would you expect as a user?
+Turns out, `Timer` will **not** run any task already scheduled if it is not already running. In contrast, a `ScheduledExecutorService` has two methods: `shutdown()` and `shutdownNow()`. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow `Timer`.
+
+Lastly, regarding any possible task running at the time of cancellation, `Timer` will not interfere. Meaning it will not even __try to cancel__  it. The same is true for `ScheduledExecutorService#shutdown()`. In comparison, `shutdownNow()` will indeed __try to cancel__  the task.
+The wording __try to cancel__ is appropriate. In general we can't stop a running task. There is no absolute mechanism to do so. Ultimately it is up to the task itself (the `Runnable` instance). More on this later.
+
+==== Getting on with it
+
+The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as `@volatile` would be the least powerful solution. However, because of the way I set up things, the `mainLoop()` method is not on the same scope as the `cancel()` method, and makes this awkward. I use `AtomicBoolean` instead; effectively a more powerful construct than needed.
+
+.Cancellation - First try. Builds on top of previous listing <<firstSeriousSolution>>
+[#cancellationFirstAttempt]
+[%collapsible]
+====
+[source, diff]
+----
+
+import java.util.Comparator
++ import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{BlockingQueue, PriorityBlockingQueue}
+
+class CustomTimer private (
++ shutdown: AtomicBoolean,
+  lock: Object,
+  queue: BlockingQueue[(Runnable, Long)]
+) {
+
++ def cancel(): Unit = shutdown.set(true)
+
+  def schedule(runnable: Runnable, delay: Long): Unit = {
++   if (shutdown.get()) throw new IllegalArgumentException("Timer already cancelled.")
+    val thisTask = (runnable, System.currentTimeMillis() + delay)
+    queue.put(thisTask)
+    if (queue.peek() == thisTask) {
+      lock.synchronized {
+        lock.notify()
+      }
+    }
+  }
+}
+
+object CustomTimer {
+
+  private def comparator: Comparator[(Runnable, Long)] =
+    new Comparator[(Runnable, Long)] {
+      def compare(o1: (Runnable, Long), o2: (Runnable, Long)): Int =
+        (o1._2 - o2._2).toInt
+    }
+
+  def apply(threadName: String): CustomTimer = {
++   val shutdown = new AtomicBoolean(false)
+    val lock: Object = new Object()
+    val queue = new PriorityBlockingQueue[(Runnable, Long)](10, comparator)
+
+    def mainLoop(): Unit =
+-     while (true) {
++     while (!shutdown.get()) {
+        val tuple @ (runnableTask, whenToRun) = queue.take()
+        val timeToWait = whenToRun - System.currentTimeMillis()
+        if (timeToWait <= 0) runnableTask.run()
+        else {
+          lock.synchronized {
+            lock.wait(timeToWait)
+          }
+          queue.offer(tuple)
+        }
+      }
+
+    val timerThread = new Thread(new Runnable { def run(): Unit = mainLoop() })
+    timerThread.setName(threadName)
+    timerThread.setDaemon(false)
+    timerThread.start()
+-   new CustomTimer(lock, queue)
++   new CustomTimer(shutdown, lock, queue)
+  }
+}
+
+----
+====
+
+This solution is decent enough, but a slight problem makes it not really fit for production.
+
+.Problem 1. Program runs forever.
+[%collapsible]
+====
+[source,scala]
+----
+object SomeTests extends App {
+  val javaTimer = CustomTimer("FooBarTimer")
+  Thread.sleep(1) // <1>
+  javaTimer.cancel()
+} // <2>
+----
+<1> This hack tries to ensure the timer thread enters the loop before cancellation is requested
+<2> Thread `main` exits here. What about other threads of the program?
+====
+
+The program above would never terminate.
+The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at `queue.take()`. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.
+
+.Problem 2. Program runs for 10 hours and then does not run the task.
+[%collapsible]
+====
+[source,scala]
+----
+import java.util.TimerTask
+import scala.concurrent.duration._
+
+object SomeTests extends App {
+  val javaTimer = CustomTimer("FooBarTimer")
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(10.second) },
+    10.hours.toMillis
+  )
+
+  javaTimer.cancel()
+}
+----
+====
+
+Similarly, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at `lock.wait(timeWait)`, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after `timeWait` expires and then exit the loop, terminating the thread. If `timeWait` is 10 hours, then the JVM program will exit after 10 hours.
+This is similar to what happens for the equivalent method `ScheduledThreadPoolExecutor#shutdown()` (but not for `shutdownNow()`). Off course in that case, the executor would wait 10 hours **but** actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours **and never** run it.
+
+==== The case for `Thread#interrupt()`
+
+The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The problem is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as the `schedule()`: enter the lock, and then notify the timer thread.
+
+.Partial Fix
+[%collapsible]
+====
+[source,scala]
+----
+def cancel(): Unit = {
+  shutdown.set(true)
+  lock.synchronized {
+    lock.notify()
+  }
+}
+----
+====
+
+Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is exactly the approach that `Timer` takes.
+In our case the solution is not fully water-proof because it only works if the timer thread is **already** blocked at `lock.wait(timeWait)`. If the timer thread is already inside a loop iteration **but** hasn't entered the lock yet, we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the `mainLoop()`. Changes which are present on `Timer` off course.
+
+In any case, this doesn't solve the first problem, when the queue is empty and the timer thread blocked at `queue.take()`. There are potentially two ways of solving this.
+
+===== Poison pills
+
+One is to use poison pills in addition to the code block above. An ominous term.
+This concept is a common mechanism for cancellation. It is not used by `Timer`. It consists of an agrement between the clients and the timer threads that a particular message signals the cancellation. This message is the "Poison pill". In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
+
+.Cancellation - Fixed
+[#cancellationFixed]
+[%collapsible]
+====
+[source, diff]
+----
+
++ import com.cmhteixeira.concurrent.timer.CustomTimer.PoisonPill
+import java.util.Comparator
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{BlockingQueue, PriorityBlockingQueue}
+
+class CustomTimer private (
+  shutdown: AtomicBoolean,
+  lock: Object,
+  queue: BlockingQueue[(Runnable, Long)]
+) {
+
+  def cancel(): Unit = {
+    shutdown.set(true)
++   queue.put((PoisonPill, 0))
++   lock.synchronized {
++     lock.notify()
++   }
+  }
+
+  def schedule(runnable: Runnable, delay: Long): Unit = {
+    if (shutdown.get())
+      throw new IllegalArgumentException("Timer already cancelled.")
+    val thisTask = (runnable, System.currentTimeMillis() + delay)
+    queue.put(thisTask)
+    if (queue.peek() == thisTask) {
+      lock.synchronized {
+        lock.notify()
+      }
+    }
+  }
+}
+
+object CustomTimer {
+
++ private object PoisonPill extends Runnable {
++   override def run(): Unit =
++     throw new RuntimeException("This will never happen.")
++ }
+
+  private def comparator: Comparator[(Runnable, Long)] =
+    new Comparator[(Runnable, Long)] {
+      def compare(o1: (Runnable, Long), o2: (Runnable, Long)): Int =
+        (o1._2 - o2._2).toInt
+    }
+
+  def apply(threadName: String): CustomTimer = {
+    val shutdown = new AtomicBoolean(false)
+    val lock: Object = new Object()
+    val queue = new PriorityBlockingQueue[(Runnable, Long)](10, comparator)
+
+    def mainLoop(): Unit =
+      while (!shutdown.get()) {
+        val tuple @ (runnableTask, whenToRun) = queue.take()
++       if (runnableTask.isInstanceOf[PoisonPill.type]) ()
+        else {
+          val timeToWait = whenToRun - System.currentTimeMillis()
+          if (timeToWait <= 0) runnableTask.run()
+          else {
+            lock.synchronized {
+              lock.wait(timeToWait)
+            }
+            queue.offer(tuple)
+          }
+        }
+      }
+
+    val timerThread = new Thread(new Runnable { def run(): Unit = mainLoop() })
+    timerThread.setName(threadName)
+    timerThread.setDaemon(false)
+    timerThread.start()
+    new CustomTimer(shutdown, lock, queue)
+  }
+}
+
+
+----
+====
+
+
+
+With the code above, the behaviour is quite similar to what `Timer` has, although timer does not use poison pills. Becuase `Timer` has its own bespoke queue, which it explictily locks, it doesn't have our problem, and gets away only with solution this.
+
+===== Thread interruption
+
+There is another solution to the problem. It is more interesting than the poison pill in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
+The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
+Java Threads have these three methods that someone with a reference to a `Thread` object can call: `Thread#interrupt()`, `Thread#isInterrupted()`, and `Thread#interrupted()`. Additionally, and this is really the important part, the JVM  documented behaviour states that when a thread is blocked by methods such as `<Some-Object>.wait()`, `<Some-Object>.wait(<some-timeout>)`, and then the thread is isterruped, the thread is able to detect it and wake-up early, throwing a `InterruptedException`.
+
+This solves our original first problem when our timer thread is blocked at `lock.wait(<timeWaiting>)`. It also solves the second problem, because `queue.take()` also is able to "sense" thread interruption. We know this because of the documented behaviour of `PriorityBlockingQueue.take()`. Furthermore, inside of it, the mechanism is the same. That is, that `queue.take()` eventually calls a native blocking method (`wait()`), which is itself aware of interruption, and then it bubbles up.
+
+
+.Cancellation - Fixed with Thread interrupts
+[#cancellationFixedWithInterrupts]
+[%collapsible]
+====
+[source, diff]
+----
+
+import java.util.Comparator
+- import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{BlockingQueue, PriorityBlockingQueue}
+
+class CustomTimer private (
+- shutdown: AtomicBoolean,
++ threadHandle: Thread,
+  lock: Object,
+  queue: BlockingQueue[(Runnable, Long)]
+) {
+
+- def cancel(): Unit = shutdown.set(true)
++ def cancel(): Unit = threadHandle.interrupt()
+
+  def schedule(runnable: Runnable, delay: Long): Unit = {
+-   if (shutdown.get())
++   if (threadHandle.isInterrupted || !threadHandle.isAlive)
+      throw new IllegalArgumentException("Timer already cancelled.")
+    val thisTask = (runnable, System.currentTimeMillis() + delay)
+    queue.put(thisTask)
+    if (queue.peek() == thisTask) {
+      lock.synchronized {
+        lock.notify()
+      }
+    }
+  }
+}
+
+object CustomTimer {
+
+  private def comparator: Comparator[(Runnable, Long)] =
+    new Comparator[(Runnable, Long)] {
+      def compare(o1: (Runnable, Long), o2: (Runnable, Long)): Int =
+        (o1._2 - o2._2).toInt
+    }
+
+  def apply(threadName: String): CustomTimer = {
+-   val shutdown = new AtomicBoolean(false)
+    val lock: Object = new Object()
+    val queue = new PriorityBlockingQueue[(Runnable, Long)](10, comparator)
+
+    def mainLoop(): Unit = {
++     try {
+-       while (!shutdown.get()) {
++       while (!Thread.currentThread().isInterrupted) {
+          val tuple @ (runnableTask, whenToRun) = queue.take()
+          val timeToWait = whenToRun - System.currentTimeMillis()
+          if (timeToWait <= 0) runnableTask.run()
+          else {
+            lock.synchronized {
+              lock.wait(timeToWait)
+            }
+            queue.offer(tuple)
+          }
+        }
++     } catch {
++         case _: InterruptedException => ()
++     } finally {
++       queue.clear()
++     }
+    }
+
+    val timerThread = new Thread(new Runnable { def run(): Unit = mainLoop() })
+    timerThread.setName(threadName)
+    timerThread.setDaemon(false)
+    timerThread.start()
+-   new CustomTimer(shutdown, lock, queue)
++   new CustomTimer(timerThread, lock, queue)
+  }
+}
+----
+====
+
+=== Common issues
+
+==== Delayed Tasks
+
+Because `Timer` and our custom timer only have one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.
+
+.Delay of execution of a task. See illustration <<delayExecutionOfTaskImage, below>>.
+[#delayExecutionOfTask]
+[%collapsible]
+====
+[source,scala]
+----
+
+import java.util.{Timer, TimerTask}
+import scala.concurrent.duration._
+
+object SomeTests extends App {
+
+  val javaTimer = new Timer("FooBarTimer")
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(70.second) },
+    10.second.toMillis
+  )
+
+  javaTimer.schedule(
+    new TimerTask { def run() = spin(20.second) },
+    30.second.toMillis
+  )
+}
+----
+====
+
+
+.Thread states of a `java.util.Timer` for the listing <<delayExecutionOfTask, above>>. Task2 starts running after the intended time. Similar result using the custom timer.
+[#delayExecutionOfTaskImage]
 image::./images/TimerThreadLane_DelayedTask.svg[]
 
-The `ScheduledThreadPoolExecutor` lessens this problem by having multiple threads that can pick up tasks. __Lessens__ is the appropriate word, as the problem is not fully solved. If more tasks than threads are submitted, **and** each of these takes longer to run than the next is due, this task will be late.
+The `ScheduledThreadPoolExecutor` lessens this problem by having multiple threads that can pick up tasks. __Lessens__ is the appropriate word, as the problem is not fully solved.
+If the clients submit more tasks than there are threads, **and** each of these takes longer to run than the next is due, some task will start running later than intended.
 
 This shortcoming is why `Timer` (and similarly for `ScheduledThreadPoolExecutor`) has two similar methods for scheduling periodic tasks:
 
-* `schedule(<task>, <delay>, <period>)`, and
+* `schedule(<task>, <delay>, <period>)`
 * `scheduleAtFixedRate(<task>, <delay>, <period>)`.
 
-For the first, the `period` represents the time that should elapse between the execution of each task.
-For the second, the `period` represents the frequency (e.g. rate) at which the task should run.
+For the first, the `period` represents the time that should elapse between the end of one execution, to the beginning of the next execution of the task.
+For the second, the `period` represents the frequency (i.e., rate) at which the task should run.
 After some minutes of thinking, you will conclude that these two concepts are **not** equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run a task every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the 2nd case it runs 60 times to keep up.
 
 While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of `Timer`. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.
+
+==== Exceptions destroy the timer
+
+When a task being executed by `Timer` throws an exception, the thread dies, and the `Timer` itself behaves as if it had been cancelled; meaning no more tasks can be scheduled. In contrast, `ScheduledThreadPoolExecutor` takes a more defensive approach, and is able to recuperate and continue running normally.
+On our <<cancellationFirstAttempt, current solution>>, given that there is no `try/catch` block in sight, it's clear that our thread will exit as well. Our offense is that we have no mechanism to stop any further task submissions. Less concerning, but also bad, is the fact the we don't remove the tasks on the queue; these will never be run, and are obsolete references. Let's add the last improvements in:
+
+
+=== Final comparison
+
+.Cherry-picked comparison points between the `Timer` and the timer we have developed
+[cols="1,1,1"]
+|===
+||`java.util.Timer` | Our custom timer
+
+|Number of threads
+|1
+|1
+
+|Thread created upon instantiation
+|✓
+|✓
+
+|Shared data structure
+|Bespoke binary queue w/ locking
+|Existing blocking priority queue
+
+|Relies on `Object#wait(<timeout>)` for scheduling?
+|✓
+|✓
+
+|Object used for locking
+|Uses the queue directly.
+|Specific object, created with that objective
+
+|Relies on `System.currentTimeMillis()`?
+|✓
+|✓
+
+|===
