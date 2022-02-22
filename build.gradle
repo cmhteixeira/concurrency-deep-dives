@@ -1,0 +1,61 @@
+plugins {
+    id 'org.asciidoctor.jvm.convert' version '3.3.2'
+    id 'org.asciidoctor.jvm.pdf' version '3.3.2'
+    id 'org.asciidoctor.jvm.revealjs' version '3.3.2'
+    id 'org.asciidoctor.jvm.gems' version '3.3.2'
+}
+
+apply plugin: 'java'
+
+
+repositories {
+    jcenter()
+    ruby.gems()
+}
+
+dependencies {
+    asciidoctorGems 'rubygems:rouge:3.15.0'
+}
+
+asciidoctor {
+    sourceDir file('.')
+    sources {
+        include 'javaTimer.adoc'
+    }
+    outputDir file('build/docs')
+}
+
+pdfThemes {
+    github 'basic', {
+        organisation = 'fwilhe2'
+        repository = 'corporate-theme'
+        relativePath = 'resources/themes'
+
+        branch = 'master'
+        tag = '1.0.1'
+        commit = '4910271e8c3964b60e186a62f3e4339ed0752714'
+    }
+}
+
+asciidoctorPdf {
+    dependsOn asciidoctorGemsPrepare
+    baseDirFollowsSourceFile()
+
+    sourceDir file('.')
+    sources {
+        include 'javaTimer.adoc'
+    }
+
+    asciidoctorj {
+        requires 'rouge'
+        attributes 'build-gradle': file('build.gradle'),
+                'sourcedir': project.sourceSets.main.java.srcDirs[0],
+                'endpoint-url': 'http://example.org',
+                'source-highlighter': 'rouge',
+//                'imagesdir': './images',
+                'toc': 'left',
+                'icons': 'font',
+                'idprefix': '',
+                'idseparator': '-'
+    }
+}
