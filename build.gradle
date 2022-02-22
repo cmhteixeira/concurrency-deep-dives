@@ -22,7 +22,7 @@ asciidoctor {
     sources {
         include 'javaTimer.adoc'
     }
-    outputDir file('build/docs')
+    outputDir file('build/docs/concurrency')
 }
 
 pdfThemes {
