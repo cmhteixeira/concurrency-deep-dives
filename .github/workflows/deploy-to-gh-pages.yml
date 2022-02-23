@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Publish to GitHub Pages
 on:
   push:
     branches:
@@ -10,16 +10,27 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v2.3.1
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v2
+      - name: Install Node.js
+        uses: actions/setup-node@v2
         with:
-          java-version: 17
-          distribution: 'adopt'
-      - name: Build with Gradle
-        run: gradle asciidoctor
+          node-version: '16'
+
+      - name: Install Antora
+        run: npm i --no-fund --no-audit --quiet antora
+
+      - name: Run Antora
+        run: npx antora --fetch antora-playbook.yml
+
+      - name: "Create empty file .nojekyll to make things work"
+        run: |
+          touch build/site/.nojekyll
+
+      - name: "List folder"
+        run: |
+           tree $GITHUB_WORKSPACE
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.5
         with:
           branch: gh-pages
-          folder: build/docs
+          folder: build/site

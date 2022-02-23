@@ -1,6 +1,6 @@
-name: javaTimer
-title: Java Timer
-version: '1.0'
-start_page: module:javaTimer.adoc
+name: concurrency
+title: Concurrency
+version: master
+start_page: javaTimer.adoc
 nav:
   - modules/ROOT/nav.adoc

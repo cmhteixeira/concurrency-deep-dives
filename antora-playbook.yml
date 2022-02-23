@@ -1,0 +1,10 @@
+site:
+  title: Concurrency Deep Dives
+  url: https://cmhteixeira.com/concurrency
+content:
+  sources:
+    - url: .
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
