@@ -1,0 +1,6 @@
+name: javaTimer
+title: Java Timer
+version: '1.0'
+start_page: module:javaTimer.adoc
+nav:
+  - modules/ROOT/nav.adoc

@@ -30,7 +30,7 @@ The most basic form of a timer is therefore a lonely thread whose sole purpose i
 //The best way to understand the timer is to visualize all these threads interacting through a queue. The client of the `Timer` submit (produce) the tasks, and the *SINGLE* thread of the `Timer` removes (consumes) it and runs it when its time comes. Obviously though, that queue is hidden way from the API.
 
 .High-level representation of how a timer works internally.
-image::./images/Overview.svg[]
+image::Overview.svg[]
 
 It turns out, the `Timer` class is very much well represented in the above diagram. In particular, a `Timer` is associated with a *SINGLE* thread. Every time you create a new instance, a new thread is created. That thread goes on an infinite loop. On each iteration it checks if there is a task that it should run. It executes it if there is, and then proceeds to the next iteration. This is essentially it.
 
@@ -164,7 +164,7 @@ object SomeTests extends App {
 ====
 
 .States of the timer thread for the listing <<threadSleepsWhenQueueEmpty, above>>. No tasks on the queue, means the thread will be in a waiting state, whereby the CPU will not run it.
-image::./images/TimerThreadLane-Attempt1.svg[]
+image::TimerThreadLane-Attempt1.svg[]
 
 Are you surprised of the usage of `System.currentTimeMillis()` to help schedule the tasks? Don't be. `Timer` uses the exact same mechanism.
 
@@ -210,7 +210,7 @@ object SomeTests extends App {
 
 .States of the thread of a `java.util.Timer` for the listing <<twoTasksScheduled, above>>.
 [#javaTimerTwoTasksScheduled]
-image::./images/TimerThreadLane.svg[]
+image::TimerThreadLane.svg[]
 
 The timer (and therefore associated thread) is created at around time 0, and immediately after two tasks are submitted. Task 1, schedule to run 30 seconds from now and Task 2, schedule to run 90 seconds from now. Both tasks are just a while loop for 20 seconds.
 
@@ -271,7 +271,7 @@ object SomeTests extends App {
 ====
 
 .States of the timer thread of a `java.util.Timer` for the listing <<submitNewTaskWhenThreadIsWaitingForAnother, above>>.
-image::./images/TimerThreadLane-ExtraTask.svg[]
+image::TimerThreadLane-ExtraTask.svg[]
 
 But wait, there is more. Notice dashed line at 60 seconds, when Task 3 is introduced? Well, if we were to zoom-in, we would notice that the thread wakes up for a very brief period of time In the order of microseconds. This is necessary off course to verify when the ew Task 3 has to be run and take appropriate action.
 
@@ -385,7 +385,7 @@ When a client asks for cancellation, the system might be in four major states.
 4. No task running, but some tasks scheduled.
 
 .Revisiting the high-level representation. Plus cancellation.
-image::./images/OverviewWithCancellation.svg[]
+image::OverviewWithCancellation.svg[]
 
 This raises questions.
 
@@ -762,7 +762,7 @@ object SomeTests extends App {
 
 .Thread states of a `java.util.Timer` for the listing <<delayExecutionOfTask, above>>. Task2 starts running after the intended time. Similar result using the custom timer.
 [#delayExecutionOfTaskImage]
-image::./images/TimerThreadLane_DelayedTask.svg[]
+image::TimerThreadLane_DelayedTask.svg[]
 
 The `ScheduledThreadPoolExecutor` lessens this problem by having multiple threads that can pick up tasks. __Lessens__ is the appropriate word, as the problem is not fully solved.
 If the clients submit more tasks than there are threads, **and** each of these takes longer to run than the next is due, some task will start running later than intended.
