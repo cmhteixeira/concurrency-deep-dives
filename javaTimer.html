@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>The Java Timer :: Concurrency</title>
-    <meta name="generator" content="Antora 2.3.4">
+    <meta name="generator" content="Antora 3.0.1">
     <link rel="stylesheet" href="../../_/css/site.css">
     <script>var uiRootPath = '../../_'</script>
   </head>
@@ -240,8 +240,8 @@ We will focus on the first method. It&#8217;s the simplest, but still requires u
 <div class="paragraph">
 <p>(We will follow with Scala source code. The syntax is different, but in practise its the same thing)</p>
 </div>
-<div class="exampleblock">
-<div class="title">Example 2. Attempt 1 - Naive approach</div>
+<details>
+<summary class="title">Attempt 1 - Naive approach</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -276,7 +276,7 @@ object CustomTimer {
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>Hopefully I didn&#8217;t disappoint in leveraging the existing <code>BlockingQueue/LinkedBlockingQueue</code>. Developing one from scratch would be very instructive, but this is a beast on its own.</p>
 </div>
@@ -286,8 +286,8 @@ object CustomTimer {
 <div class="paragraph">
 <p>We can see that by profiling the thread state:</p>
 </div>
-<div class="exampleblock">
-<div class="title">Example 3. spin method. Useful for tests. Used throughout.</div>
+<details>
+<summary class="title">spin method. Useful for tests. Used throughout.</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -300,9 +300,9 @@ def spin(duration: Duration): Unit = {
 </div>
 </div>
 </div>
-</div>
-<div id="threadSleepsWhenQueueEmpty" class="exampleblock">
-<div class="title">Example 4. Thread "sleeps" when queue is empty</div>
+</details>
+<details id="threadSleepsWhenQueueEmpty">
+<summary class="title">Thread "sleeps" when queue is empty</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -334,7 +334,7 @@ object SomeTests extends App {
 </table>
 </div>
 </div>
-</div>
+</details>
 <div class="imageblock">
 <div class="content">
 <img src="_images/TimerThreadLane-Attempt1.svg" alt="TimerThreadLane Attempt1">
@@ -360,8 +360,8 @@ object SomeTests extends App {
 <div class="paragraph">
 <p>This is indeed what <code>Timer</code> does. The diagram shows what the timer thread is doing for the code at [1]:</p>
 </div>
-<div id="twoTasksScheduled" class="exampleblock">
-<div class="title">Example 5. Scheduling of two tasks</div>
+<details id="twoTasksScheduled">
+<summary class="title">Scheduling of two tasks</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -393,7 +393,7 @@ object SomeTests extends App {
 </table>
 </div>
 </div>
-</div>
+</details>
 <div id="javaTimerTwoTasksScheduled" class="imageblock">
 <div class="content">
 <img src="_images/TimerThreadLane.svg" alt="TimerThreadLane">
@@ -428,8 +428,8 @@ The problem is we would miss-schedule tasks the clients submit <strong>after</st
 <div class="paragraph">
 <p>By contrast, the <code>Timer</code> correctly wakes up prematurely, and is able to run Task 3 <strong>before</strong> Task 2:</p>
 </div>
-<div id="submitNewTaskWhenThreadIsWaitingForAnother" class="exampleblock">
-<div class="title">Example 6. Submitting a task due sooner</div>
+<details id="submitNewTaskWhenThreadIsWaitingForAnother">
+<summary class="title">Submitting a task due sooner</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -472,7 +472,7 @@ object SomeTests extends App {
 </table>
 </div>
 </div>
-</div>
+</details>
 <div class="imageblock">
 <div class="content">
 <img src="_images/TimerThreadLane-ExtraTask.svg" alt="TimerThreadLane ExtraTask">
@@ -508,8 +508,8 @@ Most likely, some of the people reading already know these.These exist on every 
 <div class="paragraph">
 <p>With them, I am able to meet the requirement above.</p>
 </div>
-<div id="firstSeriousSolution" class="exampleblock">
-<div class="title">Example 7. A serious solution</div>
+<details id="firstSeriousSolution">
+<summary class="title">A serious solution</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -575,7 +575,7 @@ object CustomTimer {
 </table>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>The <code>lock.notify()</code> and <code>lock.wait(&lt;timeout&gt;)</code> play the dance together.<br>
 The timer thread takes the next task to run.<br>
@@ -670,8 +670,8 @@ The wording <em>try to cancel</em> is appropriate. In general we can&#8217;t sto
 <div class="paragraph">
 <p>The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as <code>@volatile</code> would be the least powerful solution. However, because of the way I set up things, the <code>mainLoop()</code> method is not on the same scope as the <code>cancel()</code> method, and makes this awkward. I use <code>AtomicBoolean</code> instead; effectively a more powerful construct than needed.</p>
 </div>
-<div id="cancellationFirstAttempt" class="exampleblock">
-<div class="title">Example 8. Cancellation - First try. Builds on top of previous listing <a href="#firstSeriousSolution">A serious solution</a></div>
+<details id="cancellationFirstAttempt">
+<summary class="title">Cancellation - First try. Builds on top of previous listing <a href="#firstSeriousSolution">A serious solution</a></summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -737,12 +737,12 @@ object CustomTimer {
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>This solution is decent enough, but a slight problem makes it not really fit for production.</p>
 </div>
-<div class="exampleblock">
-<div class="title">Example 9. Problem 1. Program runs forever.</div>
+<details>
+<summary class="title">Problem 1. Program runs forever.</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -766,13 +766,13 @@ object CustomTimer {
 </table>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>The program above would never terminate.<br>
 The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at <code>queue.take()</code>. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.</p>
 </div>
-<div class="exampleblock">
-<div class="title">Example 10. Problem 2. Program runs for 10 hours and then does not run the task.</div>
+<details>
+<summary class="title">Problem 2. Program runs for 10 hours and then does not run the task.</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -792,7 +792,7 @@ object SomeTests extends App {
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>Similarly, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at <code>lock.wait(timeWait)</code>, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after <code>timeWait</code> expires and then exit the loop, terminating the thread. If <code>timeWait</code> is 10 hours, then the JVM program will exit after 10 hours.<br>
 This is similar to what happens for the equivalent method <code>ScheduledThreadPoolExecutor#shutdown()</code> (but not for <code>shutdownNow()</code>). Off course in that case, the executor would wait 10 hours <strong>but</strong> actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours <strong>and never</strong> run it.</p>
@@ -803,8 +803,8 @@ This is similar to what happens for the equivalent method <code>ScheduledThreadP
 <div class="paragraph">
 <p>The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The problem is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as the <code>schedule()</code>: enter the lock, and then notify the timer thread.</p>
 </div>
-<div class="exampleblock">
-<div class="title">Example 11. Partial Fix</div>
+<details>
+<summary class="title">Partial Fix</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -817,7 +817,7 @@ This is similar to what happens for the equivalent method <code>ScheduledThreadP
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is exactly the approach that <code>Timer</code> takes.<br>
 In our case the solution is not fully water-proof because it only works if the timer thread is <strong>already</strong> blocked at <code>lock.wait(timeWait)</code>. If the timer thread is already inside a loop iteration <strong>but</strong> hasn&#8217;t entered the lock yet, we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the <code>mainLoop()</code>. Changes which are present on <code>Timer</code> off course.</p>
@@ -831,8 +831,8 @@ In our case the solution is not fully water-proof because it only works if the t
 <p>One is to use poison pills in addition to the code block above. An ominous term.<br>
 This concept is a common mechanism for cancellation. It is not used by <code>Timer</code>. It consists of an agrement between the clients and the timer threads that a particular message signals the cancellation. This message is the "Poison pill". In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.</p>
 </div>
-<div id="cancellationFixed" class="exampleblock">
-<div class="title">Example 12. Cancellation - Fixed</div>
+<details id="cancellationFixed">
+<summary class="title">Cancellation - Fixed</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -912,7 +912,7 @@ object CustomTimer {
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="paragraph">
 <p>With the code above, the behaviour is quite similar to what <code>Timer</code> has, although timer does not use poison pills. Becuase <code>Timer</code> has its own bespoke queue, which it explictily locks, it doesn&#8217;t have our problem, and gets away only with solution this.</p>
 </div>
@@ -927,8 +927,8 @@ Java Threads have these three methods that someone with a reference to a <code>T
 <div class="paragraph">
 <p>This solves our original first problem when our timer thread is blocked at <code>lock.wait(&lt;timeWaiting&gt;)</code>. It also solves the second problem, because <code>queue.take()</code> also is able to "sense" thread interruption. We know this because of the documented behaviour of <code>PriorityBlockingQueue.take()</code>. Furthermore, inside of it, the mechanism is the same. That is, that <code>queue.take()</code> eventually calls a native blocking method (<code>wait()</code>), which is itself aware of interruption, and then it bubbles up.</p>
 </div>
-<div id="cancellationFixedWithInterrupts" class="exampleblock">
-<div class="title">Example 13. Cancellation - Fixed with Thread interrupts</div>
+<details id="cancellationFixedWithInterrupts">
+<summary class="title">Cancellation - Fixed with Thread interrupts</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -1005,7 +1005,7 @@ object CustomTimer {
 </div>
 </div>
 </div>
-</div>
+</details>
 </div>
 </div>
 </div>
@@ -1016,8 +1016,8 @@ object CustomTimer {
 <div class="paragraph">
 <p>Because <code>Timer</code> and our custom timer only have one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.</p>
 </div>
-<div id="delayExecutionOfTask" class="exampleblock">
-<div class="title">Example 14. Delay of execution of a task. See illustration <a href="#delayExecutionOfTaskImage">below</a>.</div>
+<details id="delayExecutionOfTask">
+<summary class="title">Delay of execution of a task. See illustration <a href="#delayExecutionOfTaskImage">below</a>.</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -1041,7 +1041,7 @@ object SomeTests extends App {
 </div>
 </div>
 </div>
-</div>
+</details>
 <div id="delayExecutionOfTaskImage" class="imageblock">
 <div class="content">
 <img src="_images/TimerThreadLane_DelayedTask.svg" alt="TimerThreadLane DelayedTask">
