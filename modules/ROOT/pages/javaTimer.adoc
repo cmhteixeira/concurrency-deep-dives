@@ -373,7 +373,7 @@ The previously solution has a race condition. Its not a big bug. The solution is
 
 === Cancellation
 
-Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is underrated. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.
+Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is overlooked. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.
 
 What do we mean by cancellation? We want the timer to stop running tasks, and for the associated resources to be released, which will mean at least the timer thread terminates. We also want the cancellation to be reliable, predictable, safe. Well, that goes without saying. What those things mean in this context however, is still to be determined.
 
@@ -387,20 +387,20 @@ When a client asks for cancellation, the system might be in four major states.
 .Revisiting the high-level representation. Plus cancellation.
 image::OverviewWithCancellation.svg[]
 
-This raises questions.
+This raises questions about what to exactly do when cancellation is requested.
 
 1. Do we try to cancel an actively running task?
     - Is it even possible to cancel an actively running task?
-2. If we let it run, do we also run the additional tasks on the queue?
-3. If yes, do we allow new tasks to be submitted if they are scheduled to run before the last one? (The last one being the latest task at the time of the cancellation request)
+2. If yes to above, do we also then run the additional tasks, that were already on the queue prior to cancellation?
+3. If yes to above, do we then also allow new tasks to be submitted if they are scheduled to run before the last one? (The last one being the latest task at the time of the cancellation request)
 
-Starting in reverse order. On question 3, the answer is *no*. For `Timer` and also for  `ScheduledExecutorService`. Once cancellation is requested, no more tasks can be added. Any further submissions result in an exception. We will follow that as well.
+Starting in reverse, for question 3, the answer is *no*. For `Timer` and also for  `ScheduledExecutorService`. Once cancellation is requested, no more tasks can be added, regardless of their scheduled time to run. Any further submissions result in an exception. We will follow that as well.
 
-For question 2, that is up for debate. What would you expect as a user?
-Turns out, `Timer` will **not** run any task already scheduled if it is not already running. In contrast, a `ScheduledExecutorService` has two methods: `shutdown()` and `shutdownNow()`. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow `Timer`.
+For question 2, that is up for debate. What would you, as a user, expect?
+Turns out, `Timer` will **not** run any task already scheduled if it is not already running. They are  removed from the queue immediately - when `cancel` returns, the queue is empty. In contrast, a `ScheduledExecutorService` has two methods: `shutdown()` and `shutdownNow()`. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow `Timer`.
 
 Lastly, regarding any possible task running at the time of cancellation, `Timer` will not interfere. Meaning it will not even __try to cancel__  it. The same is true for `ScheduledExecutorService#shutdown()`. In comparison, `shutdownNow()` will indeed __try to cancel__  the task.
-The wording __try to cancel__ is appropriate. In general we can't stop a running task. There is no absolute mechanism to do so. Ultimately it is up to the task itself (the `Runnable` instance). More on this later.
+The wording __try to cancel__ is appropriate. There is no mechanism in the Java/JVM world to force a running task to stop. There are only cooperative mechanisms. Ultimately it is up to the task (e.g., the `Runnable` instance) itself to comply. More on this later.
 
 ==== Getting on with it
 
@@ -489,14 +489,15 @@ object SomeTests extends App {
   javaTimer.cancel()
 } // <2>
 ----
-<1> This hack tries to ensure the timer thread enters the loop before cancellation is requested
-<2> Thread `main` exits here. What about other threads of the program?
+<1> This hack __tries__ to ensure the timer thread enters the loop before cancellation is requested. Not core part of the example.
+<2> Thread `main` exits here. What about the other thread of the program?
 ====
 
 The program above would never terminate.
-The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at `queue.take()`. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.
+The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at `queue.take()`. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task, namely via the mechanism discussed earlier. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.
 
 .Problem 2. Program runs for 10 hours and then does not run the task.
+[#cancellationSecondProblem]
 [%collapsible]
 ====
 [source,scala]
@@ -517,14 +518,14 @@ object SomeTests extends App {
 ----
 ====
 
-Similarly, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at `lock.wait(timeWait)`, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after `timeWait` expires and then exit the loop, terminating the thread. If `timeWait` is 10 hours, then the JVM program will exit after 10 hours.
-This is similar to what happens for the equivalent method `ScheduledThreadPoolExecutor#shutdown()` (but not for `shutdownNow()`). Off course in that case, the executor would wait 10 hours **but** actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours **and never** run it.
+Similarly, and referencing <<cancellationSecondProblem, the code above>>, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at `lock.wait(timeWait)`, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after `timeWait` expires and then exit the loop, terminating the thread. If `timeWait` is 10 hours, then the JVM program will exit after 10 hours.
+This is similar to what happens for the equivalent method `ScheduledThreadPoolExecutor#shutdown()` (but not for `shutdownNow()`). Off course in that case, the thread would wait 10 hours **but** actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours **and never** run it.
 
 ==== The case for `Thread#interrupt()`
 
-The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The problem is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as the `schedule()`: enter the lock, and then notify the timer thread.
+The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The problem is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as `schedule()` does: enter the lock, and then notify the timer thread.
 
-.Partial Fix
+.Fixing Problem 1
 [%collapsible]
 ====
 [source,scala]
@@ -538,15 +539,15 @@ def cancel(): Unit = {
 ----
 ====
 
-Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is exactly the approach that `Timer` takes.
-In our case the solution is not fully water-proof because it only works if the timer thread is **already** blocked at `lock.wait(timeWait)`. If the timer thread is already inside a loop iteration **but** hasn't entered the lock yet, we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the `mainLoop()`. Changes which are present on `Timer` off course.
+Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is [.underline]#exactly# the approach that `Timer` takes.
+In our case the solution is not fully water-proof because it only works if the timer thread is **already** blocked at `lock.wait(timeWait)`. If the timer thread is already inside a loop iteration **but** hasn't entered the lock yet, then the `lock.notify()` from the client thread exits before having a chance to wake up the other thread, and we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the `mainLoop()`. Changes which are present on `Timer` off course.
 
 In any case, this doesn't solve the first problem, when the queue is empty and the timer thread blocked at `queue.take()`. There are potentially two ways of solving this.
 
 ===== Poison pills
 
-One is to use poison pills in addition to the code block above. An ominous term.
-This concept is a common mechanism for cancellation. It is not used by `Timer`. It consists of an agrement between the clients and the timer threads that a particular message signals the cancellation. This message is the "Poison pill". In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
+One is to use poison pills in addition to the code block above.
+This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by `Timer`. It consists of an agreement between the clients and the timer threads that a special message signals the cancellation. This message is the `Poison pill`. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
 
 .Cancellation - Fixed
 [#cancellationFixed]
