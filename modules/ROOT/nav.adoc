@@ -1,26 +1,26 @@
 * Timers
 ** xref:javaTimer.adoc[]
-** Hierarchical timer wheels (todo)
+** Hierarchical timer wheels 🚧
 
-* Data structures
-** To state management
-*** Concurrent Maps (todo)
-** Thread communication
-*** Treiber Stack (todo)
-*** Priority Queue (todo)
-*** FIFO queues (todo)
+* Data structures 🚧
+** To state management 🚧
+*** Concurrent Maps 🚧
+** Thread communication 🚧
+*** Treiber Stack 🚧
+*** Priority Queue 🚧
+*** FIFO queues 🚧
 
 
-* Lower level concepts
-** Mutexes and Conditional variables (todo)
-** Semaphores (todo)
-** Light switches (todo)
-** Barriers (todo)
-** Cyclic Barriers (todo)
-** Count-Down Latch (todo)
-** Futures and Promises (todo)
-** Lock Free Programming and CAS (todo)
+* Lower level concepts 🚧
+** Mutexes and Conditional variables 🚧
+** Semaphores 🚧
+** Light switches 🚧
+** Barriers 🚧
+** Cyclic Barriers 🚧
+** Count-Down Latch 🚧
+** Futures and Promises 🚧
+** Lock Free Programming and CAS 🚧
 
-* Thread Pools
-** Your average thread pool (todo)
-** ForkJoinPool (work-stealing)
+* Thread Pools 🚧
+** Your average thread pool 🚧
+** Work-Stealing thread pool 🚧
