@@ -650,7 +650,7 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 <div class="sect2">
 <h3 id="_cancellation"><a class="anchor" href="#_cancellation"></a>Cancellation</h3>
 <div class="paragraph">
-<p>Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is underrated. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.</p>
+<p>Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is overlooked. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.</p>
 </div>
 <div class="paragraph">
 <p>What do we mean by cancellation? We want the timer to stop running tasks, and for the associated resources to be released, which will mean at least the timer thread terminates. We also want the cancellation to be reliable, predictable, safe. Well, that goes without saying. What those things mean in this context however, is still to be determined.</p>
@@ -681,7 +681,7 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 <div class="title">Figure 5. Revisiting the high-level representation. Plus cancellation.</div>
 </div>
 <div class="paragraph">
-<p>This raises questions.</p>
+<p>This raises questions about what to exactly do when cancellation is requested.</p>
 </div>
 <div class="olist arabic">
 <ol class="arabic">
@@ -696,23 +696,23 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 </div>
 </li>
 <li>
-<p>If we let it run, do we also run the additional tasks on the queue?</p>
+<p>If yes to above, do we also then run the additional tasks, that were already on the queue prior to cancellation?</p>
 </li>
 <li>
-<p>If yes, do we allow new tasks to be submitted if they are scheduled to run before the last one? (The last one being the latest task at the time of the cancellation request)</p>
+<p>If yes to above, do we then also allow new tasks to be submitted if they are scheduled to run before the last one? (The last one being the latest task at the time of the cancellation request)</p>
 </li>
 </ol>
 </div>
 <div class="paragraph">
-<p>Starting in reverse order. On question 3, the answer is <strong>no</strong>. For <code>Timer</code> and also for  <code>ScheduledExecutorService</code>. Once cancellation is requested, no more tasks can be added. Any further submissions result in an exception. We will follow that as well.</p>
+<p>Starting in reverse, for question 3, the answer is <strong>no</strong>. For <code>Timer</code> and also for  <code>ScheduledExecutorService</code>. Once cancellation is requested, no more tasks can be added, regardless of their scheduled time to run. Any further submissions result in an exception. We will follow that as well.</p>
 </div>
 <div class="paragraph">
-<p>For question 2, that is up for debate. What would you expect as a user?<br>
-Turns out, <code>Timer</code> will <strong>not</strong> run any task already scheduled if it is not already running. In contrast, a <code>ScheduledExecutorService</code> has two methods: <code>shutdown()</code> and <code>shutdownNow()</code>. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow <code>Timer</code>.</p>
+<p>For question 2, that is up for debate. What would you, as a user, expect?<br>
+Turns out, <code>Timer</code> will <strong>not</strong> run any task already scheduled if it is not already running. They are  removed from the queue immediately - when <code>cancel</code> returns, the queue is empty. In contrast, a <code>ScheduledExecutorService</code> has two methods: <code>shutdown()</code> and <code>shutdownNow()</code>. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow <code>Timer</code>.</p>
 </div>
 <div class="paragraph">
 <p>Lastly, regarding any possible task running at the time of cancellation, <code>Timer</code> will not interfere. Meaning it will not even <em>try to cancel</em>  it. The same is true for <code>ScheduledExecutorService#shutdown()</code>. In comparison, <code>shutdownNow()</code> will indeed <em>try to cancel</em>  the task.<br>
-The wording <em>try to cancel</em> is appropriate. In general we can&#8217;t stop a running task. There is no absolute mechanism to do so. Ultimately it is up to the task itself (the <code>Runnable</code> instance). More on this later.</p>
+The wording <em>try to cancel</em> is appropriate. There is no mechanism in the Java/JVM world to force a running task to stop. There are only cooperative mechanisms. Ultimately it is up to the task (e.g., the <code>Runnable</code> instance) itself to comply. More on this later.</p>
 </div>
 <div class="sect3">
 <h4 id="_getting_on_with_it"><a class="anchor" href="#_getting_on_with_it"></a>Getting on with it</h4>
