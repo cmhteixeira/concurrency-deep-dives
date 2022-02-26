@@ -806,11 +806,11 @@ object CustomTimer {
 <table>
 <tr>
 <td><i class="conum" data-value="1"></i><b>1</b></td>
-<td>This hack tries to ensure the timer thread enters the loop before cancellation is requested</td>
+<td>This hack <em>tries</em> to ensure the timer thread enters the loop before cancellation is requested. Not core part of the example.</td>
 </tr>
 <tr>
 <td><i class="conum" data-value="2"></i><b>2</b></td>
-<td>Thread <code>main</code> exits here. What about other threads of the program?</td>
+<td>Thread <code>main</code> exits here. What about the other thread of the program?</td>
 </tr>
 </table>
 </div>
@@ -818,9 +818,9 @@ object CustomTimer {
 </details>
 <div class="paragraph">
 <p>The program above would never terminate.<br>
-The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at <code>queue.take()</code>. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.</p>
+The problem is that if cancellation is requested when the queue is empty - which will definitely happen because a client has no way of knowing the state of the queue - then the timer thread blocks at <code>queue.take()</code>. The thread goes into a waiting state, from which it would not wake up unless a client submitted a new task, namely via the mechanism discussed earlier. Because the JVM does not shutdown until all non-daemon threads have finished, and because our timer thread is non-daemon and is still active (despite being blocked), then the program never terminates. This behaviour would cause enormous confusion in an even small code base.</p>
 </div>
-<details>
+<details id="cancellationSecondProblem">
 <summary class="title">Problem 2. Program runs for 10 hours and then does not run the task.</summary>
 <div class="content">
 <div class="listingblock">
@@ -843,17 +843,17 @@ object SomeTests extends App {
 </div>
 </details>
 <div class="paragraph">
-<p>Similarly, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at <code>lock.wait(timeWait)</code>, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after <code>timeWait</code> expires and then exit the loop, terminating the thread. If <code>timeWait</code> is 10 hours, then the JVM program will exit after 10 hours.<br>
-This is similar to what happens for the equivalent method <code>ScheduledThreadPoolExecutor#shutdown()</code> (but not for <code>shutdownNow()</code>). Off course in that case, the executor would wait 10 hours <strong>but</strong> actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours <strong>and never</strong> run it.</p>
+<p>Similarly, and referencing <a href="#cancellationSecondProblem">the code above</a>, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at <code>lock.wait(timeWait)</code>, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after <code>timeWait</code> expires and then exit the loop, terminating the thread. If <code>timeWait</code> is 10 hours, then the JVM program will exit after 10 hours.<br>
+This is similar to what happens for the equivalent method <code>ScheduledThreadPoolExecutor#shutdown()</code> (but not for <code>shutdownNow()</code>). Off course in that case, the thread would wait 10 hours <strong>but</strong> actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours <strong>and never</strong> run it.</p>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_the_case_for_threadinterrupt"><a class="anchor" href="#_the_case_for_threadinterrupt"></a>The case for <code>Thread#interrupt()</code></h4>
 <div class="paragraph">
-<p>The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The problem is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as the <code>schedule()</code>: enter the lock, and then notify the timer thread.</p>
+<p>The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The problem is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as <code>schedule()</code> does: enter the lock, and then notify the timer thread.</p>
 </div>
 <details>
-<summary class="title">Partial Fix</summary>
+<summary class="title">Fixing Problem 1</summary>
 <div class="content">
 <div class="listingblock">
 <div class="content">
@@ -868,8 +868,8 @@ This is similar to what happens for the equivalent method <code>ScheduledThreadP
 </div>
 </details>
 <div class="paragraph">
-<p>Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is exactly the approach that <code>Timer</code> takes.<br>
-In our case the solution is not fully water-proof because it only works if the timer thread is <strong>already</strong> blocked at <code>lock.wait(timeWait)</code>. If the timer thread is already inside a loop iteration <strong>but</strong> hasn&#8217;t entered the lock yet, we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the <code>mainLoop()</code>. Changes which are present on <code>Timer</code> off course.</p>
+<p>Because now we enter the same lock that the timer thread is waiting one, we are able to wake up the thread prematurely which will then be able to read the updated flag. This is <span class="underline">exactly</span> the approach that <code>Timer</code> takes.<br>
+In our case the solution is not fully water-proof because it only works if the timer thread is <strong>already</strong> blocked at <code>lock.wait(timeWait)</code>. If the timer thread is already inside a loop iteration <strong>but</strong> hasn&#8217;t entered the lock yet, then the <code>lock.notify()</code> from the client thread exits before having a chance to wake up the other thread, and we go back to the same problem. This is a race condition. The time window for this to occur is very small, but exists. It can be fixed by making a few smart changes on the <code>mainLoop()</code>. Changes which are present on <code>Timer</code> off course.</p>
 </div>
 <div class="paragraph">
 <p>In any case, this doesn&#8217;t solve the first problem, when the queue is empty and the timer thread blocked at <code>queue.take()</code>. There are potentially two ways of solving this.</p>
@@ -877,8 +877,8 @@ In our case the solution is not fully water-proof because it only works if the t
 <div class="sect4">
 <h5 id="_poison_pills"><a class="anchor" href="#_poison_pills"></a>Poison pills</h5>
 <div class="paragraph">
-<p>One is to use poison pills in addition to the code block above. An ominous term.<br>
-This concept is a common mechanism for cancellation. It is not used by <code>Timer</code>. It consists of an agrement between the clients and the timer threads that a particular message signals the cancellation. This message is the "Poison pill". In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.</p>
+<p>One is to use poison pills in addition to the code block above.<br>
+This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by <code>Timer</code>. It consists of an agreement between the clients and the timer threads that a special message signals the cancellation. This message is the <code>Poison pill</code>. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.</p>
 </div>
 <details id="cancellationFixed">
 <summary class="title">Cancellation - Fixed</summary>
