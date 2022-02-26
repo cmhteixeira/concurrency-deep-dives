@@ -13,7 +13,8 @@ Here I want to study the `java.util.Timer` class (henceforth just `Timer`) and d
 Yes. You can definitely roll out your own! Like all things concurrency, you shouldn't use your own implementation in production, but actually being able to do develop one from scratch makes you feel incredibly competent, reduces the angst of using concepts like a black-box, and guides your judgement when you do use external code that deals with this for you.
 
 
-.Summary - TLDR
+== Summary - TLDR
+
 * Every `Timer` that is instantiated starts a thread. A [.underline]#single# new thread.
 ** The thread is essentially a `while(true)` loop over a queue of tasks.
 ** The thread is responsible for both running the tasks, and deciding when to run the next task.
@@ -50,7 +51,7 @@ Notice in particular you can have many clients of a `Timer`. That is, many parts
 //The documentation itself warns about this. You should avoid long computations for the tasks submitted to this `Timers.`
 
 
-== Implementing your own
+===  The API
 
 There are 4 public methods.
 
@@ -74,7 +75,7 @@ We will focus on the first method. It's the simplest, but still requires us to a
 
 `TimerTask` above is a concept which exists for the purpose of `Timer`. It is essentially a `Runnable`. Lets not dwell too much on it. Not overly relevant to the core understanding.
 
-=== Attempt 1 - Naive approach
+== Attempt 1 - Naive approach
 
 We need the following:
 1. Thread safe data structure.
@@ -219,7 +220,7 @@ The timer (and therefore associated thread) is created at around time 0, and imm
 2. After it runs, it goes back to idle until Task 2 is meant to run.
 3. After running Task 2, as there are no more tasks submitted, it correctly goes bak to a "Waiting state".
 
-=== Attempt 2
+== Attempt 2
 
 We could improve our custom <<Attempt 1 - Naive approach>>, by calling `Thread.sleep(<duration>)`, where `duration` would be the time interval until the next task is meant to run. That is, on each iteration we take the task which should run next, and then put the thread to sleep until it should run. when it wakes, the thread then runs it, and moves on to the next iteration.
 The problem is we would miss-schedule tasks the clients submit *after* the timer thread goes to the sleep state. Is there a mechanism for the thread sleeping after `Thread.sleep()` to woken up?
@@ -367,11 +368,11 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 
 Notice that, if clients schedule new tasks which are not inserted at the ehad of the preiority queue, then the timer thread will not be awaken (in case it was waiting).
 
-==== A bug
+=== A bug
 
 The previously solution has a race condition. Its not a big bug. The solution is still very decent. But probably you wouldn't want to use it in production. Well, but that is already an assumption on everything we have been doing. Do you want to try to identify the race condition?
 
-=== Cancellation
+== Cancellation
 
 Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is overlooked. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.
 
@@ -402,7 +403,7 @@ Turns out, `Timer` will **not** run any task already scheduled if it is not alre
 Lastly, regarding any possible task running at the time of cancellation, `Timer` will not interfere. Meaning it will not even __try to cancel__  it. The same is true for `ScheduledExecutorService#shutdown()`. In comparison, `shutdownNow()` will indeed __try to cancel__  the task.
 The wording __try to cancel__ is appropriate. There is no mechanism in the Java/JVM world to force a running task to stop. There are only cooperative mechanisms. Ultimately it is up to the task (e.g., the `Runnable` instance) itself to comply. More on this later.
 
-==== Getting on with it
+=== Getting on with it
 
 The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as `@volatile` would be the least powerful solution. However, because of the way I set up things, the `mainLoop()` method is not on the same scope as the `cancel()` method, and makes this awkward. I use `AtomicBoolean` instead; effectively a more powerful construct than needed.
 
@@ -521,7 +522,7 @@ object SomeTests extends App {
 Similarly, and referencing <<cancellationSecondProblem, the code above>>, if there are still tasks to run when cancellation is requested, then the timer thread might be blocked at `lock.wait(timeWait)`, waiting to run. In this scenario, the thread only has a chance to see the updated shutdown flag after `timeWait` expires and then exit the loop, terminating the thread. If `timeWait` is 10 hours, then the JVM program will exit after 10 hours.
 This is similar to what happens for the equivalent method `ScheduledThreadPoolExecutor#shutdown()` (but not for `shutdownNow()`). Off course in that case, the thread would wait 10 hours **but** actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours **and never** run it.
 
-==== The case for `Thread#interrupt()`
+=== The case for `Thread#interrupt()`
 
 The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The problem is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as `schedule()` does: enter the lock, and then notify the timer thread.
 
@@ -544,7 +545,7 @@ In our case the solution is not fully water-proof because it only works if the t
 
 In any case, this doesn't solve the first problem, when the queue is empty and the timer thread blocked at `queue.take()`. There are potentially two ways of solving this.
 
-===== Poison pills
+==== Poison pills
 
 One is to use poison pills in addition to the code block above.
 This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by `Timer`. It consists of an agreement between the clients and the timer threads that a special message signals the cancellation. This message is the `Poison pill`. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
@@ -638,7 +639,7 @@ object CustomTimer {
 
 With the code above, the behaviour is quite similar to what `Timer` has, although timer does not use poison pills. Becuase `Timer` has its own bespoke queue, which it explictily locks, it doesn't have our problem, and gets away only with solution this.
 
-===== Thread interruption
+==== Thread interruption
 
 There is another solution to the problem. It is more interesting than the poison pill in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
 The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
@@ -727,9 +728,9 @@ object CustomTimer {
 ----
 ====
 
-=== Common issues
+== Common issues
 
-==== Delayed Tasks
+=== Delayed Tasks
 
 Because `Timer` and our custom timer only have one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.
 
@@ -779,13 +780,13 @@ After some minutes of thinking, you will conclude that these two concepts are **
 
 While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of `Timer`. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.
 
-==== Exceptions destroy the timer
+=== Exceptions destroy the timer
 
 When a task being executed by `Timer` throws an exception, the thread dies, and the `Timer` itself behaves as if it had been cancelled; meaning no more tasks can be scheduled. In contrast, `ScheduledThreadPoolExecutor` takes a more defensive approach, and is able to recuperate and continue running normally.
 On our <<cancellationFirstAttempt, current solution>>, given that there is no `try/catch` block in sight, it's clear that our thread will exit as well. Our offense is that we have no mechanism to stop any further task submissions. Less concerning, but also bad, is the fact the we don't remove the tasks on the queue; these will never be run, and are obsolete references. Let's add the last improvements in:
 
 
-=== Final comparison
+== Final comparison
 
 .Cherry-picked comparison points between the `Timer` and the timer we have developed
 [cols="1,1,1"]
