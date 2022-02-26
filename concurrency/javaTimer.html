@@ -178,8 +178,12 @@
 <div class="paragraph">
 <p>Yes. You can definitely roll out your own! Like all things concurrency, you shouldn&#8217;t use your own implementation in production, but actually being able to do develop one from scratch makes you feel incredibly competent, reduces the angst of using concepts like a black-box, and guides your judgement when you do use external code that deals with this for you.</p>
 </div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_summary_tldr"><a class="anchor" href="#_summary_tldr"></a>Summary - TLDR</h2>
+<div class="sectionbody">
 <div class="ulist">
-<div class="title">Summary - TLDR</div>
 <ul>
 <li>
 <p>Every <code>Timer</code> that is instantiated starts a thread. A <span class="underline">single</span> new thread.</p>
@@ -246,11 +250,8 @@
 <div class="paragraph">
 <p>Notice in particular you can have many clients of a <code>Timer</code>. That is, many parts of your code base with a reference to the same object. Each may submit tasks, and be running on a different thread. This demands the "shared data structure" be thread-safe.</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_implementing_your_own"><a class="anchor" href="#_implementing_your_own"></a>Implementing your own</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="_the_api"><a class="anchor" href="#_the_api"></a>The API</h3>
 <div class="paragraph">
 <p>There are 4 public methods.</p>
 </div>
@@ -279,8 +280,12 @@ We will focus on the first method. It&#8217;s the simplest, but still requires u
 <div class="paragraph">
 <p><code>TimerTask</code> above is a concept which exists for the purpose of <code>Timer</code>. It is essentially a <code>Runnable</code>. Lets not dwell too much on it. Not overly relevant to the core understanding.</p>
 </div>
-<div class="sect2">
-<h3 id="_attempt_1_naive_approach"><a class="anchor" href="#_attempt_1_naive_approach"></a>Attempt 1 - Naive approach</h3>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_attempt_1_naive_approach"><a class="anchor" href="#_attempt_1_naive_approach"></a>Attempt 1 - Naive approach</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>We need the following:<br>
 1. Thread safe data structure.<br>
@@ -459,8 +464,10 @@ object SomeTests extends App {
 3. After running Task 2, as there are no more tasks submitted, it correctly goes bak to a "Waiting state".</p>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_attempt_2"><a class="anchor" href="#_attempt_2"></a>Attempt 2</h3>
+</div>
+<div class="sect1">
+<h2 id="_attempt_2"><a class="anchor" href="#_attempt_2"></a>Attempt 2</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>We could improve our custom <a href="#_attempt_1_naive_approach">Attempt 1 - Naive approach</a>, by calling <code>Thread.sleep(&lt;duration&gt;)</code>, where <code>duration</code> would be the time interval until the next task is meant to run. That is, on each iteration we take the task which should run next, and then put the thread to sleep until it should run. when it wakes, the thread then runs it, and moves on to the next iteration.<br>
 The problem is we would miss-schedule tasks the clients submit <strong>after</strong> the timer thread goes to the sleep state. Is there a mechanism for the thread sleeping after <code>Thread.sleep()</code> to woken up?</p>
@@ -640,15 +647,17 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 <div class="paragraph">
 <p>Notice that, if clients schedule new tasks which are not inserted at the ehad of the preiority queue, then the timer thread will not be awaken (in case it was waiting).</p>
 </div>
-<div class="sect3">
-<h4 id="_a_bug"><a class="anchor" href="#_a_bug"></a>A bug</h4>
+<div class="sect2">
+<h3 id="_a_bug"><a class="anchor" href="#_a_bug"></a>A bug</h3>
 <div class="paragraph">
 <p>The previously solution has a race condition. Its not a big bug. The solution is still very decent. But probably you wouldn&#8217;t want to use it in production. Well, but that is already an assumption on everything we have been doing. Do you want to try to identify the race condition?</p>
 </div>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_cancellation"><a class="anchor" href="#_cancellation"></a>Cancellation</h3>
+</div>
+<div class="sect1">
+<h2 id="_cancellation"><a class="anchor" href="#_cancellation"></a>Cancellation</h2>
+<div class="sectionbody">
 <div class="paragraph">
 <p>Most people nowadays work in the context of existing web server applications which are meant to run forever. Because we are less exposed to this issue of shutting a system down, its importance is overlooked. However, cancellation and end-of-lifecycle behaviour for a standalone timer (or any executor service) is a critical feature.</p>
 </div>
@@ -714,8 +723,8 @@ Turns out, <code>Timer</code> will <strong>not</strong> run any task already sch
 <p>Lastly, regarding any possible task running at the time of cancellation, <code>Timer</code> will not interfere. Meaning it will not even <em>try to cancel</em>  it. The same is true for <code>ScheduledExecutorService#shutdown()</code>. In comparison, <code>shutdownNow()</code> will indeed <em>try to cancel</em>  the task.<br>
 The wording <em>try to cancel</em> is appropriate. There is no mechanism in the Java/JVM world to force a running task to stop. There are only cooperative mechanisms. Ultimately it is up to the task (e.g., the <code>Runnable</code> instance) itself to comply. More on this later.</p>
 </div>
-<div class="sect3">
-<h4 id="_getting_on_with_it"><a class="anchor" href="#_getting_on_with_it"></a>Getting on with it</h4>
+<div class="sect2">
+<h3 id="_getting_on_with_it"><a class="anchor" href="#_getting_on_with_it"></a>Getting on with it</h3>
 <div class="paragraph">
 <p>The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as <code>@volatile</code> would be the least powerful solution. However, because of the way I set up things, the <code>mainLoop()</code> method is not on the same scope as the <code>cancel()</code> method, and makes this awkward. I use <code>AtomicBoolean</code> instead; effectively a more powerful construct than needed.</p>
 </div>
@@ -847,8 +856,8 @@ object SomeTests extends App {
 This is similar to what happens for the equivalent method <code>ScheduledThreadPoolExecutor#shutdown()</code> (but not for <code>shutdownNow()</code>). Off course in that case, the thread would wait 10 hours <strong>but</strong> actually run the associated task, which is the documented behaviour for that method; whilst here we would wait 10 hours <strong>and never</strong> run it.</p>
 </div>
 </div>
-<div class="sect3">
-<h4 id="_the_case_for_threadinterrupt"><a class="anchor" href="#_the_case_for_threadinterrupt"></a>The case for <code>Thread#interrupt()</code></h4>
+<div class="sect2">
+<h3 id="_the_case_for_threadinterrupt"><a class="anchor" href="#_the_case_for_threadinterrupt"></a>The case for <code>Thread#interrupt()</code></h3>
 <div class="paragraph">
 <p>The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The problem is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as <code>schedule()</code> does: enter the lock, and then notify the timer thread.</p>
 </div>
@@ -874,8 +883,8 @@ In our case the solution is not fully water-proof because it only works if the t
 <div class="paragraph">
 <p>In any case, this doesn&#8217;t solve the first problem, when the queue is empty and the timer thread blocked at <code>queue.take()</code>. There are potentially two ways of solving this.</p>
 </div>
-<div class="sect4">
-<h5 id="_poison_pills"><a class="anchor" href="#_poison_pills"></a>Poison pills</h5>
+<div class="sect3">
+<h4 id="_poison_pills"><a class="anchor" href="#_poison_pills"></a>Poison pills</h4>
 <div class="paragraph">
 <p>One is to use poison pills in addition to the code block above.<br>
 This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by <code>Timer</code>. It consists of an agreement between the clients and the timer threads that a special message signals the cancellation. This message is the <code>Poison pill</code>. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.</p>
@@ -966,8 +975,8 @@ object CustomTimer {
 <p>With the code above, the behaviour is quite similar to what <code>Timer</code> has, although timer does not use poison pills. Becuase <code>Timer</code> has its own bespoke queue, which it explictily locks, it doesn&#8217;t have our problem, and gets away only with solution this.</p>
 </div>
 </div>
-<div class="sect4">
-<h5 id="_thread_interruption"><a class="anchor" href="#_thread_interruption"></a>Thread interruption</h5>
+<div class="sect3">
+<h4 id="_thread_interruption"><a class="anchor" href="#_thread_interruption"></a>Thread interruption</h4>
 <div class="paragraph">
 <p>There is another solution to the problem. It is more interesting than the poison pill in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.<br>
 The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.<br>
@@ -1058,10 +1067,12 @@ object CustomTimer {
 </div>
 </div>
 </div>
+</div>
+<div class="sect1">
+<h2 id="_common_issues"><a class="anchor" href="#_common_issues"></a>Common issues</h2>
+<div class="sectionbody">
 <div class="sect2">
-<h3 id="_common_issues"><a class="anchor" href="#_common_issues"></a>Common issues</h3>
-<div class="sect3">
-<h4 id="_delayed_tasks"><a class="anchor" href="#_delayed_tasks"></a>Delayed Tasks</h4>
+<h3 id="_delayed_tasks"><a class="anchor" href="#_delayed_tasks"></a>Delayed Tasks</h3>
 <div class="paragraph">
 <p>Because <code>Timer</code> and our custom timer only have one thread, if a task takes to long, the remaining tasks will not execute when they should. This should be self-evident from the previous detailed analysis.</p>
 </div>
@@ -1123,16 +1134,18 @@ After some minutes of thinking, you will conclude that these two concepts are <s
 <p>While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of <code>Timer</code>. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.</p>
 </div>
 </div>
-<div class="sect3">
-<h4 id="_exceptions_destroy_the_timer"><a class="anchor" href="#_exceptions_destroy_the_timer"></a>Exceptions destroy the timer</h4>
+<div class="sect2">
+<h3 id="_exceptions_destroy_the_timer"><a class="anchor" href="#_exceptions_destroy_the_timer"></a>Exceptions destroy the timer</h3>
 <div class="paragraph">
 <p>When a task being executed by <code>Timer</code> throws an exception, the thread dies, and the <code>Timer</code> itself behaves as if it had been cancelled; meaning no more tasks can be scheduled. In contrast, <code>ScheduledThreadPoolExecutor</code> takes a more defensive approach, and is able to recuperate and continue running normally.<br>
 On our <a href="#cancellationFirstAttempt">current solution</a>, given that there is no <code>try/catch</code> block in sight, it&#8217;s clear that our thread will exit as well. Our offense is that we have no mechanism to stop any further task submissions. Less concerning, but also bad, is the fact the we don&#8217;t remove the tasks on the queue; these will never be run, and are obsolete references. Let&#8217;s add the last improvements in:</p>
 </div>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_final_comparison"><a class="anchor" href="#_final_comparison"></a>Final comparison</h3>
+</div>
+<div class="sect1">
+<h2 id="_final_comparison"><a class="anchor" href="#_final_comparison"></a>Final comparison</h2>
+<div class="sectionbody">
 <table class="tableblock frame-all grid-all stretch">
 <caption class="title">Table 1. Cherry-picked comparison points between the <code>Timer</code> and the timer we have developed</caption>
 <colgroup>
@@ -1180,7 +1193,6 @@ On our <a href="#cancellationFirstAttempt">current solution</a>, given that ther
 </tr>
 </tbody>
 </table>
-</div>
 </div>
 </div>
 </article>
