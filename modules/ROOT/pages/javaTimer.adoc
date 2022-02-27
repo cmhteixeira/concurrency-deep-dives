@@ -644,15 +644,8 @@ With the code <<cancellationFixed,above>>, we achieve a respectable timer/schedu
 ==== Thread interruption
 
 There is an alternative solution to the problem: Thread interruption.
-Thread interruption is a common way to implement cancellation in the Jvm. `Timer` does not use it but the `ScheduledExecutorService` (and related `java.util.concurrent.ThreadPoolExecutor`) do use it to implement the `shutdownNow()` functionality.
-In a way, this approach is more interesting than <<Poison pills>>, since poison pills are
-
-
-It is more interesting than the previous in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
-The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
-
-There is another approach to the cancellation problem. It is more interesting than the previous in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
-The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
+Thread interruption is a common way to implement cancellation on the JVM. `Timer` does not use it but the `ScheduledExecutorService` (and related `java.util.concurrent.ThreadPoolExecutor`) do use it to implement the `shutdownNow()` functionality.
+In a way, this approach is more interesting than <<Poison pills>>. Poison pills are language agnostic, and does not leverage any peculiarities of the JVM itself. With thread interrupts we have an excuse to study a relatively unknown behaviour of Java, which is off course important for a Java/Scala/JVM developer studying concurrency, as this can be regarded as a primitive.
 
 Java Threads have three methods that a client holding a reference to a `Thread` (often referred to as thread handle) object can call:
 
@@ -668,9 +661,24 @@ public class Thread {
 ----
 ====
 
-Here is the important part. The JVM's  documented behaviour states that when a thread calls native blocking methods, such as `Object#wait()`, and `Object#wait(<some-timeout>)`, and then said thread is interrupted, it is able to detect it and wake-up early, throwing a `InterruptedException`.
+Here is the important part. The JVM's  documented behaviour states that when a given thread is blocked at __native blocking__ methods, such as `Object#wait()`, and some other different thread calls `interrupt()` on the former, then the underlying system (i.e., the JVM) can detect it and is able to wake-up the former thread, throwing a `InterruptedException`.
 
-This solves our original first problem when our timer thread is blocked at `lock.wait(<timeWaiting>)`. It also solves the second problem, because `queue.take()` also is able to "sense" thread interruption. We know this because of the documented behaviour of `PriorityBlockingQueue.take()`. Furthermore, inside of it, the mechanism is the same. That is, that `queue.take()` eventually calls a native blocking method (`wait()`), which is itself aware of interruption, and then it bubbles up.
+This behaviour solves both problems at once.
+On the first problem, the timer thread is blocked at `lock.wait(<timeWaiting>)`. Therefore, if another thread gets hold of the timer thread's handle, and calls `interrupt()` we can expect the timer thread will wake-up and then throw an exception. We can catch that exception and proceed with cancellation.
+
+On the second problem, the timer thread is blocked at `queue.take()`. Now, this is not one of the naive methods documented for interrupts. However, the documentation on the priority queue that we are using reads:
+
+.Java docs for method `take()` of `java.util.concurrent.BlockingQueue<E>`.
+> /*
+> * Retrieves and removes the head of this queue, waiting if necessary
+* until an element becomes available.
+*
+* @return the head of this queue
+* **@throws InterruptedException if interrupted while waiting**
+*/
+E take() throws InterruptedException;
+
+We can be sure that in this scenario the timer thread will also wake-up and throw an exception. If we were to explore how `PriorityBlockingQueue` is able to guarantee the `InterruptedException` is thrown when the thread is interrupted we would conclude that eventually it is making a call to a native method (e.g., `Object#wait()`) as well, and therefore ultimately relying on the very same mechanism. This highlights the importance of studying low-level mechanisms. All other libraries must ultimately rely on them.
 
 
 .Cancellation - Fixed with Thread interrupts
