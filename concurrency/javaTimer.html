@@ -1010,7 +1010,7 @@ In a way, this approach is more interesting than <a href="#_poison_pills">Poison
 On the first problem, the timer thread is blocked at <code>lock.wait(&lt;timeWaiting&gt;)</code>. Therefore, if another thread gets hold of the timer thread&#8217;s handle, and calls <code>interrupt()</code> we can expect the timer thread will wake-up and then throw an exception. We can catch that exception and proceed with cancellation.</p>
 </div>
 <div class="paragraph">
-<p>On the second problem, the timer thread is blocked at <code>queue.take()</code>. Now, this is not one of the naive methods documented for interrupts. However on the documentation for the priority queue that we are using we see:</p>
+<p>On the second problem, the timer thread is blocked at <code>queue.take()</code>. Now, this is not one of the naive methods documented for interrupts. However, the documentation on the priority queue that we are using reads:</p>
 </div>
 <div class="quoteblock">
 <div class="title">Java docs for method <code>take()</code> of <code>java.util.concurrent.BlockingQueue&lt;E&gt;</code>.</div>
@@ -1028,7 +1028,7 @@ E take() throws InterruptedException;</p>
 </blockquote>
 </div>
 <div class="paragraph">
-<p>We can be sure that in this scenario the timer thread will also wake-up and throw an exception. If we were to explore how <code>PriorityBlockingQueue</code> is able to guarantee the <code>InterruptedException</code> is thrown when the thread is interrupted we would conclude that eventually, it is making a call to a native method (e.g., <code>Object#wait()</code>) as well, and therefore ultimately relying on the very same mechanism. That is why it is relevant to study this low-level mechanisms. All other libraries can ultimately be divided and explained using them.</p>
+<p>We can be sure that in this scenario the timer thread will also wake-up and throw an exception. If we were to explore how <code>PriorityBlockingQueue</code> is able to guarantee the <code>InterruptedException</code> is thrown when the thread is interrupted we would conclude that eventually it is making a call to a native method (e.g., <code>Object#wait()</code>) as well, and therefore ultimately relying on the very same mechanism. This highlights the importance of studying low-level mechanisms. All other libraries must ultimately rely on them.</p>
 </div>
 <details id="cancellationFixedWithInterrupts">
 <summary class="title">Cancellation - Fixed with Thread interrupts</summary>
