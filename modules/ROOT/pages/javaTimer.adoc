@@ -3,7 +3,7 @@
 :highlightjs-languages: scala
 :hardbreaks:
 
-Here I want to study the `java.util.Timer` class (henceforth just `Timer`) and distill it to its fundamentals. I want to answer:
+I want to study the `java.util.Timer` class (henceforth just `Timer`) and distill it to its fundamentals. I want to answer:
 
 * How does it essentially work?
 * What concurrency mechanisms does it use?
@@ -385,7 +385,7 @@ When a client asks for cancellation, the system might be in four major states.
 3. No task running, and no more tasks scheduled.
 4. No task running, but some tasks scheduled.
 
-.Revisiting the high-level representation. Plus cancellation.
+.Revisiting the high-level representation. Very useful for the discussion that follows.
 image::OverviewWithCancellation.svg[]
 
 This raises questions about what to exactly do when cancellation is requested.
@@ -398,14 +398,14 @@ This raises questions about what to exactly do when cancellation is requested.
 Starting in reverse, for question 3, the answer is *no*. For `Timer` and also for  `ScheduledExecutorService`. Once cancellation is requested, no more tasks can be added, regardless of their scheduled time to run. Any further submissions result in an exception. We will follow that as well.
 
 For question 2, that is up for debate. What would you, as a user, expect?
-Turns out, `Timer` will **not** run any task already scheduled if it is not already running. They are  removed from the queue immediately - when `cancel` returns, the queue is empty. In contrast, a `ScheduledExecutorService` has two methods: `shutdown()` and `shutdownNow()`. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow `Timer`.
+Turns out, `Timer` will **not** run any task already scheduled if it is not already running. They are  removed from the queue immediately - when `cancel` returns, the queue is empty. In contrast, a `ScheduledExecutorService` has two methods: `shutdown()` and `shutdownNow()`. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow `Timer` 's approach.
 
 Lastly, regarding any possible task running at the time of cancellation, `Timer` will not interfere. Meaning it will not even __try to cancel__  it. The same is true for `ScheduledExecutorService#shutdown()`. In comparison, `shutdownNow()` will indeed __try to cancel__  the task.
 The wording __try to cancel__ is appropriate. There is no mechanism in the Java/JVM world to force a running task to stop. There are only cooperative mechanisms. Ultimately it is up to the task (e.g., the `Runnable` instance) itself to comply. More on this later.
 
 === Getting on with it
 
-The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as `@volatile` would be the least powerful solution. However, because of the way I set up things, the `mainLoop()` method is not on the same scope as the `cancel()` method, and makes this awkward. I use `AtomicBoolean` instead; effectively a more powerful construct than needed.
+The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as `volatile` would be the least powerful solution. However, because of the way I set up things, the `mainLoop()` method is not on the same scope as the `cancel()` method, and makes this awkward. I use `AtomicBoolean` instead; effectively a more powerful construct than needed.
 
 .Cancellation - First try. Builds on top of previous listing <<firstSeriousSolution>>
 [#cancellationFirstAttempt]
@@ -523,7 +523,7 @@ This is similar to what happens for the equivalent method `ScheduledThreadPoolEx
 
 === The case for `Thread#interrupt()`
 
-The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The issue there is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as `schedule()`: enter the lock, and then notify the timer thread.
+The underlying issue in both problems is the call to a blocking method prevents the flag from being read. We could solve the second problem - when the tread is held at `lock.wait(timeWait)` - with relative ease. The issue there is that after `cancel()` is called the lock will never wake prematurely. Therefore, we could make `cancel()` act the same way as `schedule()`: enter the lock, and then notify the timer thread.
 
 .Fixing Problem 1
 [%collapsible]
@@ -546,9 +546,9 @@ In any case, this doesn't solve the first problem, when the queue is empty, and 
 
 ==== Poison pills
 
-One way to address that, is to use poison pills in addition to the code block above.
-This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by `Timer` though. It consists of an agreement between the clients and the timer thread that a special message signals the cancellation. This message is the `Poison pill`. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
-This approach works because by inserting the poison pill onto the queue upon `cancel`, if the timer thread is blocked at `queue.take()`, it will wake up. This is, off course, the same mechanism discussed earlier on setion <<Attempt 2>> about scheduling earlier tasks . Additionally, if it isn't blocked there, then the thread will exit by the other mechanism anyway.
+A solution to that problem is to use poison pills.
+This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by `Timer` though. It consists of an agreement between the clients and the timer thread that a special message signals the cancellation. This message is the `Poison Pill`. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.
+This approach works because by inserting the poison pill onto the queue upon `cancel()`, if the timer thread is blocked at `queue.take()`, it will wake up. This is, off course, the same mechanism discussed earlier on section <<Attempt 2>> about scheduling earlier tasks . Additionally, if it isn't blocked there, then the thread will exit by the other mechanism anyway.
 
 .Cancellation - Fixed
 [#cancellationFixed]
@@ -610,7 +610,7 @@ object CustomTimer {
     def mainLoop(): Unit =
       while (!shutdown.get()) {
         val tuple @ (runnableTask, whenToRun) = queue.take()
-+       if (runnableTask.isInstanceOf[PoisonPill.type]) ()
++       if (runnableTask.isInstanceOf[PoisonPill.type]) () // <1>
 +       else {
           val timeToWait = whenToRun - System.currentTimeMillis()
           if (timeToWait <= 0) runnableTask.run()
@@ -633,6 +633,7 @@ object CustomTimer {
 
 
 ----
+<1> If the task is actually a poison pill, then the while iteration finishes immediately, and the while loop breaks because the shutdown flag is also set.
 ====
 
 `Timer` does not use poison pills. As it uses a custom-made queue (namely `java.util.TaskQueue` on the same file as `java.util.Timer`), which it locks explicitly the same was way we lock our `lock` object, it is able to solve the first problem and the second problem in one go only, like we do for problem 1.
@@ -644,17 +645,10 @@ With the code <<cancellationFixed,above>>, we achieve a respectable timer/schedu
 ==== Thread interruption
 
 There is an alternative solution to the problem: Thread interruption.
-Thread interruption is a common way to implement cancellation in the Jvm. `Timer` does not use it but the `ScheduledExecutorService` (and related `java.util.concurrent.ThreadPoolExecutor`) do use it to implement the `shutdownNow()` functionality.
-In a way, this approach is more interesting than <<Poison pills>>, since poison pills are
+Thread interruption is a common way to implement cancellation on the JVM. `Timer` does not use it but the `ScheduledExecutorService` (and related `java.util.concurrent.ThreadPoolExecutor`) do use it to implement the `shutdownNow()` functionality.
+In a way, this approach is more interesting than <<Poison pills>>. Poison pills are language agnostic, and does not leverage any peculiarities of the JVM itself. With thread interrupts we have an excuse to study a relatively unknown behaviour of Java, which is off course important for a Java/Scala/JVM developer studying concurrency, as this can be regarded as a primitive.
 
-
-It is more interesting than the previous in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
-The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
-
-There is another approach to the cancellation problem. It is more interesting than the previous in the sense that the poison pill although a smart idea but does not leverage any obscure java language inner workings.
-The solution is to use Thread interruption. Thread interruption is a common way to implement cancellation. It is interesting because it leverages "native" support provided by the JVM itself, in constract with poison pills which are just a smart "trick" leveraging commonly known java source code.
-
-Java Threads have three methods that a client holding a reference to a `Thread` (often referred to as thread handle) object can call:
+Java Threads have three methods that a client holding a reference to a `Thread` object (often referred to as thread handle) can call:
 
 .JVM Threads
 ====
@@ -668,9 +662,24 @@ public class Thread {
 ----
 ====
 
-Here is the important part. The JVM's  documented behaviour states that when a thread calls native blocking methods, such as `Object#wait()`, and `Object#wait(<some-timeout>)`, and then said thread is interrupted, it is able to detect it and wake-up early, throwing a `InterruptedException`.
+Here is the important part. The JVM's  documented behaviour states that when a given thread is blocked at __native blocking__ methods, such as `Object#wait()`, and some other different thread calls `interrupt()` on the former, then the underlying system (i.e., the JVM) can detect it and is able to wake-up the former thread, throwing a `InterruptedException`.
 
-This solves our original first problem when our timer thread is blocked at `lock.wait(<timeWaiting>)`. It also solves the second problem, because `queue.take()` also is able to "sense" thread interruption. We know this because of the documented behaviour of `PriorityBlockingQueue.take()`. Furthermore, inside of it, the mechanism is the same. That is, that `queue.take()` eventually calls a native blocking method (`wait()`), which is itself aware of interruption, and then it bubbles up.
+This behaviour solves both problems at once.
+On the first problem, the timer thread is blocked at `lock.wait(<timeWaiting>)`. Therefore, if another thread gets hold of the timer thread's handle, and calls `interrupt()` we can expect the timer thread will wake-up and then throw an exception. We can catch that exception and proceed with cancellation.
+
+On the second problem, the timer thread is blocked at `queue.take()`. Now, this is not one of the naive methods documented for interrupts. However, the documentation on the priority queue that we are using reads:
+
+.Java docs for method `take()` of `java.util.concurrent.BlockingQueue<E>`.
+> /*
+> * Retrieves and removes the head of this queue, waiting if necessary
+* until an element becomes available.
+*
+* @return the head of this queue
+* **@throws InterruptedException if interrupted while waiting**
+*/
+E take() throws InterruptedException;
+
+We can be sure that in this scenario the timer thread will also wake-up and throw an exception. If we were to explore how `PriorityBlockingQueue` is able to guarantee the `InterruptedException` is thrown when the thread is interrupted we would conclude that eventually it is making a call to a native method (e.g., `Object#wait()`) as well, and therefore ultimately relying on the very same mechanism. This highlights the importance of studying low-level mechanisms. All other libraries must ultimately rely on them.
 
 
 .Cancellation - Fixed with Thread interrupts
@@ -753,6 +762,8 @@ object CustomTimer {
 ----
 ====
 
+NOTE: On the listing above, `schedule()` checks `threadHandle.isInterrupted || !threadHandle.isAlive`. Why is the first condition not sufficient? It turns out that when a thread is no longer running the JVM specification does not explicitly define `isInterruped()` should return true, and some implementations of it (namely openJDK, and Oracle) return false. So that extra check might or might not be needed. It's definitely not needed after Java 14, where the behaviour was finally corrected.
+
 == Common issues
 
 === Delayed Tasks
@@ -801,7 +812,7 @@ This shortcoming is why `Timer` (and similarly for `ScheduledThreadPoolExecutor`
 
 For the first, the `period` represents the time that should elapse between the end of one execution, to the beginning of the next execution of the task.
 For the second, the `period` represents the frequency (i.e., rate) at which the task should run.
-After some minutes of thinking, you will conclude that these two concepts are **not** equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run a task every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the 2nd case it runs 60 times to keep up.
+These two concepts are **not** equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the second case it runs 60 times to keep up.
 
 While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of `Timer`. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.
 
