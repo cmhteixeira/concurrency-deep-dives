@@ -687,7 +687,7 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 <div class="content">
 <img src="_images/OverviewWithCancellation.svg" alt="OverviewWithCancellation">
 </div>
-<div class="title">Figure 5. Revisiting the high-level representation. Plus cancellation.</div>
+<div class="title">Figure 5. Revisiting the high-level representation. Very useful for the discussion that follows.</div>
 </div>
 <div class="paragraph">
 <p>This raises questions about what to exactly do when cancellation is requested.</p>
@@ -717,7 +717,7 @@ After it wakes up, it should run the task. For the purposes of this example, we 
 </div>
 <div class="paragraph">
 <p>For question 2, that is up for debate. What would you, as a user, expect?<br>
-Turns out, <code>Timer</code> will <strong>not</strong> run any task already scheduled if it is not already running. They are  removed from the queue immediately - when <code>cancel</code> returns, the queue is empty. In contrast, a <code>ScheduledExecutorService</code> has two methods: <code>shutdown()</code> and <code>shutdownNow()</code>. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow <code>Timer</code>.</p>
+Turns out, <code>Timer</code> will <strong>not</strong> run any task already scheduled if it is not already running. They are  removed from the queue immediately - when <code>cancel</code> returns, the queue is empty. In contrast, a <code>ScheduledExecutorService</code> has two methods: <code>shutdown()</code> and <code>shutdownNow()</code>. The former runs all queued tasks. If a queued task is scheduled to run in 10 hours, then at least for those 10 hours the service will be running. The latter will discard them. We will follow <code>Timer</code> 's approach.</p>
 </div>
 <div class="paragraph">
 <p>Lastly, regarding any possible task running at the time of cancellation, <code>Timer</code> will not interfere. Meaning it will not even <em>try to cancel</em>  it. The same is true for <code>ScheduledExecutorService#shutdown()</code>. In comparison, <code>shutdownNow()</code> will indeed <em>try to cancel</em>  the task.<br>
@@ -726,7 +726,7 @@ The wording <em>try to cancel</em> is appropriate. There is no mechanism in the 
 <div class="sect2">
 <h3 id="_getting_on_with_it"><a class="anchor" href="#_getting_on_with_it"></a>Getting on with it</h3>
 <div class="paragraph">
-<p>The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as <code>@volatile</code> would be the least powerful solution. However, because of the way I set up things, the <code>mainLoop()</code> method is not on the same scope as the <code>cancel()</code> method, and makes this awkward. I use <code>AtomicBoolean</code> instead; effectively a more powerful construct than needed.</p>
+<p>The most straightforward approach is to use a flag; set by the client thread, and read by the timer thread. It must account for the fact that it will be accessed by multiple threads (at least one of the accesses being a write). In this situation, tagging a boolean as <code>volatile</code> would be the least powerful solution. However, because of the way I set up things, the <code>mainLoop()</code> method is not on the same scope as the <code>cancel()</code> method, and makes this awkward. I use <code>AtomicBoolean</code> instead; effectively a more powerful construct than needed.</p>
 </div>
 <details id="cancellationFirstAttempt">
 <summary class="title">Cancellation - First try. Builds on top of previous listing <a href="#firstSeriousSolution">A serious solution</a></summary>
@@ -858,7 +858,7 @@ This is similar to what happens for the equivalent method <code>ScheduledThreadP
 <div class="sect2">
 <h3 id="_the_case_for_threadinterrupt"><a class="anchor" href="#_the_case_for_threadinterrupt"></a>The case for <code>Thread#interrupt()</code></h3>
 <div class="paragraph">
-<p>The underlying problem is the call to those two blocking methods prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The issue there is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as <code>schedule()</code>: enter the lock, and then notify the timer thread.</p>
+<p>The underlying issue in both problems is the call to a blocking method prevents the flag from being read. We could solve the second problem - when the tread is held at <code>lock.wait(timeWait)</code> - with relative ease. The issue there is that after <code>cancel()</code> is called the lock will never wake prematurely. Therefore, we could make <code>cancel()</code> act the same way as <code>schedule()</code>: enter the lock, and then notify the timer thread.</p>
 </div>
 <details>
 <summary class="title">Fixing Problem 1</summary>
@@ -885,9 +885,9 @@ In our case the solution is not fully water-proof though. It only works if the t
 <div class="sect3">
 <h4 id="_poison_pills"><a class="anchor" href="#_poison_pills"></a>Poison pills</h4>
 <div class="paragraph">
-<p>One way to address that, is to use poison pills in addition to the code block above.<br>
-This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by <code>Timer</code> though. It consists of an agreement between the clients and the timer thread that a special message signals the cancellation. This message is the <code>Poison pill</code>. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.<br>
-This approach works because by inserting the poison pill onto the queue upon <code>cancel</code>, if the timer thread is blocked at <code>queue.take()</code>, it will wake up. This is, off course, the same mechanism discussed earlier on setion <a href="#_attempt_2">Attempt 2</a> about scheduling earlier tasks . Additionally, if it isn&#8217;t blocked there, then the thread will exit by the other mechanism anyway.</p>
+<p>A solution to that problem is to use poison pills.<br>
+This concept is a common mechanism for cancellation. In the Java world, and elsewhere. It is not used by <code>Timer</code> though. It consists of an agreement between the clients and the timer thread that a special message signals the cancellation. This message is the <code>Poison Pill</code>. In environments where there are several producers and consumers, it is harder to implement, but for our custom timer, with just one consumer thread (the timer thread), it is quite straightforward.<br>
+This approach works because by inserting the poison pill onto the queue upon <code>cancel()</code>, if the timer thread is blocked at <code>queue.take()</code>, it will wake up. This is, off course, the same mechanism discussed earlier on section <a href="#_attempt_2">Attempt 2</a> about scheduling earlier tasks . Additionally, if it isn&#8217;t blocked there, then the thread will exit by the other mechanism anyway.</p>
 </div>
 <details id="cancellationFixed">
 <summary class="title">Cancellation - Fixed</summary>
@@ -947,7 +947,7 @@ object CustomTimer {
     def mainLoop(): Unit =
       while (!shutdown.get()) {
         val tuple @ (runnableTask, whenToRun) = queue.take()
-+       if (runnableTask.isInstanceOf[PoisonPill.type]) ()
++       if (runnableTask.isInstanceOf[PoisonPill.type]) () <i class="conum" data-value="1"></i><b>(1)</b>
 +       else {
           val timeToWait = whenToRun - System.currentTimeMillis()
           if (timeToWait &lt;= 0) runnableTask.run()
@@ -969,6 +969,14 @@ object CustomTimer {
 }</code></pre>
 </div>
 </div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>If the task is actually a poison pill, then the while iteration finishes immediately, and the while loop breaks because the shutdown flag is also set.</td>
+</tr>
+</table>
+</div>
 </div>
 </details>
 <div class="paragraph">
@@ -986,7 +994,7 @@ Thread interruption is a common way to implement cancellation on the JVM. <code>
 In a way, this approach is more interesting than <a href="#_poison_pills">Poison pills</a>. Poison pills are language agnostic, and does not leverage any peculiarities of the JVM itself. With thread interrupts we have an excuse to study a relatively unknown behaviour of Java, which is off course important for a Java/Scala/JVM developer studying concurrency, as this can be regarded as a primitive.</p>
 </div>
 <div class="paragraph">
-<p>Java Threads have three methods that a client holding a reference to a <code>Thread</code> (often referred to as thread handle) object can call:</p>
+<p>Java Threads have three methods that a client holding a reference to a <code>Thread</code> object (often referred to as thread handle) can call:</p>
 </div>
 <div class="exampleblock">
 <div class="title">Example 2. JVM Threads</div>
@@ -1109,6 +1117,18 @@ object CustomTimer {
 </div>
 </div>
 </details>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+On the listing above, <code>schedule()</code> checks <code>threadHandle.isInterrupted || !threadHandle.isAlive</code>. Why is the first condition not sufficient? It turns out that when a thread is no longer running the JVM specification does not explicitly define <code>isInterruped()</code> should return true, and some implementations of it (namely openJDK, and Oracle) return false. So that extra check might or might not be needed. It&#8217;s definitely not needed after Java 14, where the behaviour was finally corrected.
+</td>
+</tr>
+</table>
+</div>
 </div>
 </div>
 </div>
