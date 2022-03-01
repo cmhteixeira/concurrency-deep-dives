@@ -3,13 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>The Java Timer :: Concurrency Deep Dives</title>
-    <link rel="canonical" href="https://cmhteixeira.com/concurrency/concurrency/javaTimer.html">
+<title>The Java Timer | Concurrency Deep Dives</title>    <link rel="canonical" href="https://cmhteixeira.com/concurrency/concurrency/javaTimer.html">
     <meta name="generator" content="Antora 3.0.1">
-    <link rel="stylesheet" href="../_/css/site.css">
-    <script>var uiRootPath = '../_'</script>
-  </head>
+<!--<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsearch.js@2.6.3/dist/cdn/docsearch.css" integrity="sha256-tY3FCmL2d8yoJBOVyC2aOxdixg8sLT6CHlDWX/VUJaY=" crossorigin="anonymous">-->
+
+
+<link rel="stylesheet" href="../_/stylesheets/vendor/asciinema-player.css">
+<link rel="stylesheet" href="../_/stylesheets/vendor/libs.css">
+<link rel="stylesheet" href="../_/stylesheets/site.css">
+<link id="highlight-style-lnk" rel="stylesheet" href="../_/stylesheets/vendor/highlight-light.css">
+<link rel="icon" href="../_/img/favicon.svg" type="image/x-icon">  </head>
   <body class="article">
+<script src="../_/js/header-site.js"></script>
 <header class="header">
   <nav class="navbar">
     <div class="navbar-brand">
@@ -128,7 +133,7 @@
   </div>
   <ul class="components">
     <li class="component is-current">
-      <a class="title" href="javaTimer.html">Concurrency</a>
+      <span class="title">Concurrency</span>
       <ul class="versions">
         <li class="version is-current is-latest">
           <a href="javaTimer.html">master</a>
@@ -136,14 +141,12 @@
       </ul>
     </li>
   </ul>
-</div>
-    </div>
+</div>    </div>
   </aside>
 </div>
 <main class="article">
 <div class="toolbar" role="navigation">
-    <button class="nav-toggle"></button>
-    <nav class="breadcrumbs" aria-label="breadcrumbs">
+    <button class="nav-toggle"></button>    <nav class="breadcrumbs" aria-label="breadcrumbs">
   <ul>
     <li><a href="javaTimer.html">Concurrency</a></li>
     <li>Timers</li>
@@ -152,12 +155,11 @@
 </nav>
     </div>
   <div class="content">
-<aside class="toc sidebar" data-title="Contents" data-levels="2">
-  <div class="toc-menu"></div>
-</aside>
 <article class="doc">
-<h1 class="page">The Java Timer</h1>
-<div id="preamble">
+
+
+  <h1 class="page">The Java Timer</h1>
+  <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
 <p>I want to study the <code>java.util.Timer</code> class (henceforth just <code>Timer</code>) and distill it to its fundamentals. I want to answer:</p>
@@ -1260,11 +1262,74 @@ On our <a href="#cancellationFirstAttempt">current solution</a>, given that ther
 </table>
 </div>
 </div>
-</article>
+  </article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
   </div>
 </main>
 </div>
+<script>window.uiRootPath = '../_'</script>
+<script async src="../_/js/vendor/asciinema-player.min.js"></script>
+<script src="../_/js/vendor/highlight.min.js"></script>
+<script src="../_/js/vendor/libs.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
 <script src="../_/js/site.js"></script>
-<script async src="../_/js/vendor/highlight.js"></script>
+
+<script>
+  // var ALGOLIA_INSIGHTS_SRC = "https://cdn.jsdelivr.net/npm/search-insights@1.7.1";
+  //
+  // !function (e, a, t, n, s, i, c) {
+  //   e.AlgoliaAnalyticsObject = s, e[s] = e[s] || function () {
+  //     (e[s].queue = e[s].queue || []).push(arguments)
+  //   }, i = a.createElement(t), c = a.getElementsByTagName(t)[0],
+  //     i.async = 1, i.src = n, c.parentNode.insertBefore(i, c)
+  // }(window, document, "script", ALGOLIA_INSIGHTS_SRC, "aa");
+</script>
+
+<script type="text/javascript">
+  docsearch({
+    container: '#docsearch',
+    appId: 'LWD25NX3CD',
+    apiKey: '6408f799f329e3a010e6a5ac397210d8',
+    indexName: 'bonitasoft',
+    hitsPerPage: 20,
+    searchParameters: {
+      facetFilters: ["version:master", "tags:concurrency"],
+    }
+  });
+  /*
+          docsearch({
+          algoliaOptions: {
+              clickAnalytics: true,
+          },
+          handleSelected: function (input, event, suggestion, datasetNumber, context) {
+              sendClickEvent(lastQueryID, lastQueryHits, suggestion);
+              input.setVal('');
+              window.location.assign(suggestion.url);
+          },
+          queryDataCallback: function (data) {
+              lastQueryID = data.results[0].queryID;
+              lastQueryHits = data.results[0].hits;
+          }
+          });
+
+          aa('init', {
+          appId: 'BH4D9OD16A',
+          apiKey: '16267f96d135c47df8454efd5b448c9a',
+          });
+      */
+</script>
+
+<script>
+  // init toggle state
+  if (localStorage.getItem('theme') === 'dark') {
+    document.getElementById('check').checked = true
+    document.getElementById('check-mobile').checked = true
+  } else {
+    document.getElementById('check').checked = false
+    document.getElementById('check-mobile').checked = false
+  }
+</script>
   </body>
 </html>

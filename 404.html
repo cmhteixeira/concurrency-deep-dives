@@ -3,12 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Page Not Found :: Concurrency Deep Dives</title>
-    <meta name="generator" content="Antora 3.0.1">
-    <link rel="stylesheet" href="/concurrency/_/css/site.css">
-    <script>var uiRootPath = '/concurrency/_'</script>
-  </head>
+<title>Page Not Found | Concurrency Deep Dives</title>    <meta name="generator" content="Antora 3.0.1">
+<!--<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsearch.js@2.6.3/dist/cdn/docsearch.css" integrity="sha256-tY3FCmL2d8yoJBOVyC2aOxdixg8sLT6CHlDWX/VUJaY=" crossorigin="anonymous">-->
+
+
+<link rel="stylesheet" href="/concurrency/_/stylesheets/vendor/asciinema-player.css">
+<link rel="stylesheet" href="/concurrency/_/stylesheets/vendor/libs.css">
+<link rel="stylesheet" href="/concurrency/_/stylesheets/site.css">
+<link id="highlight-style-lnk" rel="stylesheet" href="/concurrency/_/stylesheets/vendor/highlight-light.css">
+<link rel="icon" href="/concurrency/_/img/favicon.svg" type="image/x-icon">  </head>
   <body class="status-404">
+<script src="/concurrency/_/js/header-site.js"></script>
 <header class="header">
   <nav class="navbar">
     <div class="navbar-brand">
@@ -28,7 +33,7 @@
 <div class="nav-panel-explore is-active" data-panel="explore">
   <ul class="components">
     <li class="component">
-      <a class="title" href="/concurrency/concurrency/javaTimer.html">Concurrency</a>
+      <span class="title">Concurrency</span>
       <ul class="versions">
         <li class="version is-latest">
           <a href="/concurrency/concurrency/javaTimer.html">master</a>
@@ -36,31 +41,92 @@
       </ul>
     </li>
   </ul>
-</div>
-    </div>
+</div>    </div>
   </aside>
 </div>
 <main class="article">
 <div class="toolbar" role="navigation">
-    <button class="nav-toggle"></button>
-    <nav class="breadcrumbs" aria-label="breadcrumbs">
+    <button class="nav-toggle"></button>    <nav class="breadcrumbs" aria-label="breadcrumbs">
 </nav>
     </div>
   <div class="content">
 <article class="doc">
-<h1 class="page">Page Not Found</h1>
-<div class="paragraph">
-<p>The page you&#8217;re looking for does not exist. It may have been moved. You can follow one of the links in the navigation to the left.</p>
-</div>
-<div class="paragraph">
-<p>If you arrived on this page by clicking on a link, please notify the owner of the site that the link is broken.
-If you typed the URL of this page manually, please double check that you entered the address correctly.</p>
-</div>
-</article>
+  <h1 class="page">Page Not Found</h1>
+  <div class="paragraph">
+    <p>The page you&#8217;re looking for does not exist. It may have been moved.</p>
+  </div>
+  <div class="paragraph">
+    <p>If you arrived on this page by clicking on a link, please notify the owner of the site that the link is broken.
+      If you typed the URL of this page manually, please double check that you entered the address correctly.</p>
+  </div>
+  </article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
   </div>
 </main>
 </div>
+<script>window.uiRootPath = '/concurrency/_'</script>
+<script async src="/concurrency/_/js/vendor/asciinema-player.min.js"></script>
+<script src="/concurrency/_/js/vendor/highlight.min.js"></script>
+<script src="/concurrency/_/js/vendor/libs.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
 <script src="/concurrency/_/js/site.js"></script>
-<script async src="/concurrency/_/js/vendor/highlight.js"></script>
+
+<script>
+  // var ALGOLIA_INSIGHTS_SRC = "https://cdn.jsdelivr.net/npm/search-insights@1.7.1";
+  //
+  // !function (e, a, t, n, s, i, c) {
+  //   e.AlgoliaAnalyticsObject = s, e[s] = e[s] || function () {
+  //     (e[s].queue = e[s].queue || []).push(arguments)
+  //   }, i = a.createElement(t), c = a.getElementsByTagName(t)[0],
+  //     i.async = 1, i.src = n, c.parentNode.insertBefore(i, c)
+  // }(window, document, "script", ALGOLIA_INSIGHTS_SRC, "aa");
+</script>
+
+<script type="text/javascript">
+  docsearch({
+    container: '#docsearch',
+    appId: 'LWD25NX3CD',
+    apiKey: '6408f799f329e3a010e6a5ac397210d8',
+    indexName: 'bonitasoft',
+    hitsPerPage: 20,
+    searchParameters: {
+      facetFilters: ["version:", "tags:"],
+    }
+  });
+  /*
+          docsearch({
+          algoliaOptions: {
+              clickAnalytics: true,
+          },
+          handleSelected: function (input, event, suggestion, datasetNumber, context) {
+              sendClickEvent(lastQueryID, lastQueryHits, suggestion);
+              input.setVal('');
+              window.location.assign(suggestion.url);
+          },
+          queryDataCallback: function (data) {
+              lastQueryID = data.results[0].queryID;
+              lastQueryHits = data.results[0].hits;
+          }
+          });
+
+          aa('init', {
+          appId: 'BH4D9OD16A',
+          apiKey: '16267f96d135c47df8454efd5b448c9a',
+          });
+      */
+</script>
+
+<script>
+  // init toggle state
+  if (localStorage.getItem('theme') === 'dark') {
+    document.getElementById('check').checked = true
+    document.getElementById('check-mobile').checked = true
+  } else {
+    document.getElementById('check').checked = false
+    document.getElementById('check-mobile').checked = false
+  }
+</script>
   </body>
 </html>
