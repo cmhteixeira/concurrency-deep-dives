@@ -160,7 +160,7 @@
 <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>Here I want to study the <code>java.util.Timer</code> class (henceforth just <code>Timer</code>) and distill it to its fundamentals. I want to answer:</p>
+<p>I want to study the <code>java.util.Timer</code> class (henceforth just <code>Timer</code>) and distill it to its fundamentals. I want to answer:</p>
 </div>
 <div class="ulist">
 <ul>
@@ -1193,7 +1193,7 @@ If the clients submit more tasks than there are threads, <strong>and</strong> ea
 <div class="paragraph">
 <p>For the first, the <code>period</code> represents the time that should elapse between the end of one execution, to the beginning of the next execution of the task.<br>
 For the second, the <code>period</code> represents the frequency (i.e., rate) at which the task should run.<br>
-After some minutes of thinking, you will conclude that these two concepts are <strong>not</strong> equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run a task every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the 2nd case it runs 60 times to keep up.</p>
+These two concepts are <strong>not</strong> equivalent in the scenario where the thread is busy running other tasks and starts running the task later than it should. For example, if we schedule a task to run every 1 minute, and the thread is currently busy running a task that takes 1 hour, then after that hour, in the first case, our task runs only once (and every minute thereafter), whilst on the second case it runs 60 times to keep up.</p>
 </div>
 <div class="paragraph">
 <p>While it is useful to know this, it is mostly irrelevant to the current analysis. We only care about the concurrency fundamentals of <code>Timer</code>. Once that is known, the remaining behaviour is a matter of time, and thinking a bit harder about corner cases.</p>
