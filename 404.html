@@ -15,38 +15,54 @@
   <body class="status-404">
 <script src="/concurrency/_/js/header-site.js"></script>
 <header class="header">
-    <nav class="navbar">
-        <div class="navbar-brand">
-            <a class="navbar-item" href="https://cmhteixeira.com/concurrency">Concurrency Deep Dives</a>
+  <nav class="navbar">
+
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-item is-hoverable">
+        <a class="navbar-link" href="">Concurrency Deep Dives</a>
+      </div>
+    </div>
+
+    <div class="navbar-end" id="search-container">
+
+      <div class="container-ml">
+        <form id="singular-form-ml">
+          <button class="shown-ml" type="button" id="trigger">Notify me on new articles ✉️</button>
+          <div id="input-container-ml">
+            <input type="text" placeholder="E-mail">
+            <button type="button">Send</button>
+          </div>
+          <div id="success-ml">Thank you!</div>
+        </form>
+      </div>
+
+
+      <div class="theme-switch-wrapper">
+        <input type="checkbox" class="checkbox" onclick="toggleDarkThemeMode(this)" id="check">
+        <div class="toggle-content">
+          <label class="label" for="check">
+            <span>🌜</span>
+            <span>🌞</span>
+            <div class="ball"></div>
+          </label>
         </div>
+      </div>
 
-        <div class="navbar-end" id="search-container">
-            <div class="theme-switch-wrapper">
-                <input type="checkbox" class="checkbox" onclick="toggleDarkThemeMode(this)" id="check">
-                <div class="toggle-content">
-                    <label class="label" for="check">
-                        <span>🌜</span>
-                        <span>🌞</span>
-                        <div class="ball"></div>
-                    </label>
-                </div>
-            </div>
 
-            <button class="navbar-burger" data-target="topbar-nav-mobile">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </nav>
+      <button class="navbar-burger" data-target="topbar-nav-mobile">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
 
-    <nav id="topbar-nav-mobile" class="navbar-menu-mobile">
-                <div class="navbar-item is-hoverable">
-                    <a class="navbar-link" href="/concurrency/javaTimer.html">Concurrency</a>
-                </div>
-    </nav>
-</header>
-<div class="body">
+  <nav id="topbar-nav-mobile" class="navbar-menu-mobile">
+    <div class="navbar-item is-hoverable">
+      <a class="navbar-link" href="/concurrency/javaTimer.html">Concurrency</a>
+    </div>
+  </nav>
+</header><div class="body">
 <div class="nav-container">
   <aside class="nav">
     <div class="panels">
@@ -80,15 +96,15 @@
       If you typed the URL of this page manually, please double check that you entered the address correctly.</p>
   </div>
     <h2 class="page">Comments</h2>
-    <p class="comment-note">
-      Do you want to share feedback, discuss further ideas, or note errors ? Feel free to leave a comment here! </p>
-    <div class="giscus">
-    </div>
-    <script src="https://giscus.app/client.js" data-repo="cmhteixeira/personal-blog" data-repo-id="R_kgDOGsOmkg"
-      data-category="General" data-category-id="DIC_kwDOGsOmks4CN7IN" data-mapping="specific" data-term="Java"
-      data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en"
-      crossorigin="anonymous" async>
-      </script>
+  <p class="comment-note">
+    Do you want to share feedback, discuss further ideas, or note errors ? Feel free to leave a comment here! </p>
+  <div class="giscus">
+  </div>
+  <script src="https://giscus.app/client.js" data-repo="cmhteixeira/concurrency-deep-dives" data-repo-id="R_kgDOGsOmkg"
+    data-mapping="number" data-term="2" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom"
+    data-theme="preferred_color_scheme" data-lang="en" crossorigin="anonymous" async>
+    </script>
+
 </article><aside class="toc sidebar" data-title="Contents" data-levels="2">
   <div class="toc-menu"></div>
 </aside>
