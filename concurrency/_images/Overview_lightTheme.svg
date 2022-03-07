@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   id="svg8"
+   version="1.1"
+   viewBox="0 0 263.29653 74.615076"
+   height="74.615074mm"
+   width="263.29654mm">
+  <defs
+     id="defs2">
+    <marker
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker4019"
+       style="overflow:visible">
+      <path
+         id="path4017"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(-0.8,0,0,-0.8,-10,0)" />
+    </marker>
+    <marker
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker3843"
+       style="overflow:visible">
+      <path
+         id="path3841"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(-0.8,0,0,-0.8,-10,0)" />
+    </marker>
+    <marker
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker3595"
+       style="overflow:visible">
+      <path
+         id="path3593"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.4,0,0,0.4,4,0)" />
+    </marker>
+    <marker
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker3413"
+       style="overflow:visible">
+      <path
+         id="path3411"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.4,0,0,0.4,4,0)" />
+    </marker>
+    <marker
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker3243"
+       style="overflow:visible">
+      <path
+         id="path3241"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.4,0,0,0.4,4,0)" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="marker2952"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path2950" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="marker2638"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path2636" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="marker1294"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1025" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Arrow1Lend"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(-0.8,0,0,-0.8,-10,0)"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1028" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="marker9680"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path9678" />
+    </marker>
+    <linearGradient
+       osb:paint="solid"
+       id="linearGradient9021">
+      <stop
+         id="stop9019"
+         offset="0"
+         style="stop-color:#000000;stop-opacity:1;" />
+    </linearGradient>
+    <marker
+       style="overflow:visible"
+       id="Arrow1Lstart"
+       refX="0"
+       refY="0"
+       orient="auto">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:url(#meshgradient7337);fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path4520" />
+    </marker>
+    <style
+       id="style5695">
+      @font-face {
+        font-family: &quot;Virgil&quot;;
+        src: url(&quot;https://excalidraw.com/Virgil.woff2&quot;);
+      }
+      @font-face {
+        font-family: &quot;Cascadia&quot;;
+        src: url(&quot;https://excalidraw.com/Cascadia.woff2&quot;);
+      }
+    </style>
+    <meshgradient
+       y="68.131035"
+       x="-2.9081161"
+       gradientUnits="userSpaceOnUse"
+       id="meshgradient7337">
+      <meshrow
+         id="meshrow7339">
+        <meshpatch
+           id="meshpatch7341">
+          <stop
+             id="stop7343"
+             style="stop-color:#ffffff;stop-opacity:1"
+             path="c 8.50254,-8.50254  22.2879,-8.50254  30.7904,0" />
+          <stop
+             id="stop7345"
+             style="stop-color:#800080;stop-opacity:1"
+             path="c 8.50254,8.50254  8.50254,22.2879  0,30.7904" />
+          <stop
+             id="stop7347"
+             style="stop-color:#ffffff;stop-opacity:1"
+             path="c -8.50254,8.50254  -22.2879,8.50254  -30.7904,0" />
+          <stop
+             id="stop7349"
+             style="stop-color:#800080;stop-opacity:1"
+             path="c -8.50254,-8.50254  -8.50254,-22.2879  -5.32907e-15,-30.7904" />
+        </meshpatch>
+      </meshrow>
+    </meshgradient>
+  </defs>
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     transform="translate(-25.3256,-60.217351)"
+     id="layer1">
+    <g
+       transform="matrix(0.26458333,0,0,0.26458333,31.30406,26.440346)"
+       id="g5838">
+      <g
+         style="stroke-linecap:round"
+         transform="translate(10,208.1629)"
+         id="g5701">
+        <path
+           style="fill:none;stroke:#000000;stroke-width:1"
+           d="M 0,0 C 187.25,0 374.51,0 614.58,0 M 0,0 c 239.41,0 478.82,0 614.58,0 m 0,0 c 0,10.3 0,20.59 0,42.5 m 0,-42.5 c 0,12.89 0,25.77 0,42.5 m 0,0 c -170.96,0 -341.91,0 -614.58,0 m 614.58,0 c -198.05,0 -396.09,0 -614.58,0 m 0,0 C 0,26.89 0,11.28 0,0 M 0,42.5 C 0,31.08 0,19.67 0,0"
+           id="path5699" />
+      </g>
+      <g
+         style="stroke-linecap:round"
+         id="g5707">
+        <g
+           transform="translate(133.59668,208.19321)"
+           id="g5705">
+          <path
+             style="fill:none;stroke:#000000;stroke-width:1"
+             d="M 0,0 C 0.15,14.01 0.3,28.02 0.45,42.73 M 0,0 c 0.18,16.68 0.35,33.36 0.45,42.73"
+             id="path5703" />
+        </g>
+      </g>
+      <g
+         style="stroke-linecap:round"
+         id="g5713">
+        <g
+           transform="translate(255.11183,208.19321)"
+           id="g5711">
+          <path
+             style="fill:none;stroke:#000000;stroke-width:1"
+             d="M 0,0 C 0.14,13.23 0.28,26.46 0.45,42.73 M 0,0 c 0.1,9.74 0.21,19.49 0.45,42.73"
+             id="path5709" />
+        </g>
+      </g>
+      <g
+         style="stroke-linecap:round"
+         id="g5719">
+        <g
+           transform="translate(378.82781,208.44488)"
+           id="g5717">
+          <path
+             style="fill:none;stroke:#000000;stroke-width:1"
+             d="M 0,0 C 0.18,16.79 0.36,33.57 0.45,42.73 M 0,0 c 0.13,12.64 0.27,25.27 0.45,42.73"
+             id="path5715" />
+        </g>
+      </g>
+      <g
+         transform="translate(50.996522,219.95659)"
+         id="g5723">
+        <text
+           x="0"
+           y="14"
+           font-size="16px"
+           style="font-size:16px;font-family:Virgil, 'Segoe UI Emoji';direction:ltr;text-anchor:start;white-space:pre;fill:#000000"
+           direction="ltr"
+           id="text5721">Task1</text>
+      </g>
+      <g
+         transform="translate(167.92076,219.9869)"
+         id="g5727">
+        <text
+           x="0"
+           y="14"
+           font-size="16px"
+           style="font-size:16px;font-family:Virgil, 'Segoe UI Emoji';direction:ltr;text-anchor:start;white-space:pre;fill:#000000"
+           direction="ltr"
+           id="text5725">Task4</text>
+      </g>
+      <g
+         transform="translate(290.98137,219.38084)"
+         id="g5731">
+        <text
+           x="0"
+           y="14"
+           font-size="16px"
+           style="font-size:16px;font-family:Virgil, 'Segoe UI Emoji';direction:ltr;text-anchor:start;white-space:pre;fill:#000000"
+           direction="ltr"
+           id="text5729">Task2</text>
+      </g>
+      <g
+         style="stroke-linecap:round"
+         id="g5737">
+        <g
+           transform="translate(501.93955,208.49061)"
+           id="g5735">
+          <path
+             style="fill:none;stroke:#000000;stroke-width:1"
+             d="M 0,0 C 0.15,14.45 0.31,28.9 0.45,42.73 M 0,0 c 0.17,15.67 0.33,31.33 0.45,42.73"
+             id="path5733" />
+        </g>
+      </g>
+      <g
+         transform="translate(414.09311,219.42657)"
+         id="g5741">
+        <text
+           x="0"
+           y="14"
+           font-size="16px"
+           style="font-size:16px;font-family:Virgil, 'Segoe UI Emoji';direction:ltr;text-anchor:start;white-space:pre;fill:#000000"
+           direction="ltr"
+           id="text5739">Task10</text>
+      </g>
+      <g
+         transform="translate(558.78475,218.60257)"
+         id="g5745">
+        <text
+           x="0"
+           y="14"
+           font-size="16px"
+           style="font-size:16px;font-family:Virgil, 'Segoe UI Emoji';direction:ltr;text-anchor:start;white-space:pre;fill:#000000"
+           direction="ltr"
+           id="text5743">....</text>
+      </g>
+    </g>
+    <text
+       id="text7030"
+       y="112.10469"
+       x="46.340313"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="text-align:center;text-anchor:middle;stroke-width:0.26458332"
+         y="112.10469"
+         x="46.340313"
+         id="tspan7028">The &quot;One&quot;</tspan><tspan
+         id="tspan4203"
+         style="text-align:center;text-anchor:middle;stroke-width:0.26458332"
+         y="119.16025"
+         x="46.340313"> Thread</tspan><tspan
+         id="tspan4191"
+         style="stroke-width:0.26458332"
+         y="126.21581"
+         x="46.340313" /><tspan
+         id="tspan7032"
+         style="stroke-width:0.26458332"
+         y="133.27136"
+         x="46.340313" /></text>
+    <text
+       id="text7042"
+       y="79.157822"
+       x="51.965485"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458332"
+         y="79.157822"
+         x="51.965485"
+         id="tspan7040">shared data structure</tspan></text>
+    <g
+       id="g4324">
+      <path
+         id="path1291"
+         d="m 46.447266,93.759766 c -11.014572,0 -19.949219,8.936604 -19.949219,19.951174 0,11.01457 8.934647,19.94922 19.949219,19.94922 11.014571,0 19.951172,-8.93465 19.951172,-19.94922 0,-11.01457 -8.936601,-19.951174 -19.951172,-19.951174 z m 0,0.576172 c 10.703818,0 19.375,8.671182 19.375,19.375002 0,10.70382 -8.671182,19.37304 -19.375,19.37304 -10.703819,0 -19.375,-8.66922 -19.375,-19.37304 0,-10.70382 8.671181,-19.375002 19.375,-19.375002 z"
+         style="color:#000000;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;vector-effect:none;fill:#00000a;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.57499999;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:3.29999995;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate" />
+      <path
+         id="path4330"
+         d="m 66.110218,116.01011 1.15,1.15 -1.15,-4.025 -1.15,4.025 z"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:0.23pt;stroke-opacity:1" />
+      <path
+         id="path4332"
+         d="m 44.147907,133.37243 -1.15,1.15 4.024999,-1.15 -4.024999,-1.15 z"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:0.23pt;stroke-opacity:1" />
+      <path
+         id="path4334"
+         d="m 26.785595,111.41011 -1.15,-1.15 1.15,4.025 1.15,-4.025 z"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:0.23pt;stroke-opacity:1" />
+      <path
+         id="path4336"
+         d="m 48.747906,94.047802 1.15,-1.15 -4.024999,1.15 4.024999,1.15 z"
+         style="fill:#00000a;fill-opacity:1;fill-rule:evenodd;stroke:#00000a;stroke-width:0.23pt;stroke-opacity:1" />
+    </g>
+    <path
+       id="path3186"
+       d="M 203.30576,68.813802 V 119.44076"
+       style="fill:none;stroke:#000000;stroke-width:0.2184018px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+    <text
+       id="text3190"
+       y="64.505806"
+       x="26.520397"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="font-size:5.64444447px;stroke-width:0.26458332"
+         y="64.505806"
+         x="26.520397"
+         id="tspan3188">val timer = new Timer()</tspan></text>
+    <text
+       id="text3194"
+       y="77.105461"
+       x="205.14656"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458332"
+         y="77.105461"
+         x="205.14656"
+         id="tspan3192">[thread-1]</tspan><tspan
+         id="tspan3196"
+         style="stroke-width:0.26458332"
+         y="84.161018"
+         x="205.14656">timer.schedule(&lt;Task3&gt;, ...)</tspan></text>
+    <text
+       id="text3194-3"
+       y="93.791435"
+       x="205.2646"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458332"
+         y="93.791435"
+         x="205.2646"
+         id="tspan3192-6">[thread-2]</tspan><tspan
+         id="tspan3196-7"
+         style="stroke-width:0.26458332"
+         y="100.84699"
+         x="205.2646">timer.schedule(&lt;Task7&gt;, ...)</tspan><tspan
+         id="tspan3219"
+         style="stroke-width:0.26458332"
+         y="107.90255"
+         x="205.2646">timer.schedule(&lt;Task11&gt;, ...)</tspan></text>
+    <path
+       id="path3221"
+       d="m 203.72945,87.018997 81.2667,0.376844"
+       style="fill:none;stroke:#000000;stroke-width:0.28954005;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.28954005, 0.28954005;stroke-dashoffset:0;stroke-opacity:1" />
+    <path
+       id="path3223"
+       d="m 205.16506,82.912327 -7.73693,1.24052"
+       style="fill:none;stroke:#000000;stroke-width:0.25853765px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#marker3843)" />
+    <path
+       id="path3225"
+       d="m 204.83049,99.486021 c -0.13363,-0.133635 -7.14946,-9.387842 -7.14946,-9.387842"
+       style="fill:none;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend)" />
+    <path
+       id="path3227"
+       d="M 204.67491,106.80252 194.48526,93.606091"
+       style="fill:none;stroke:#000000;stroke-width:0.26499999;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker4019)" />
+    <text
+       id="text4189"
+       y="66.040749"
+       x="202.02946"
+       style="font-style:normal;font-weight:normal;font-size:5.64444447px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="stroke-width:0.26458332"
+         y="66.040749"
+         x="202.02946"
+         id="tspan4187">&quot;Clients&quot;</tspan></text>
+  </g>
+</svg>
