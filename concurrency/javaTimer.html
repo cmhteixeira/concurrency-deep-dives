@@ -198,12 +198,12 @@
   <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>I want to study the <code>java.util.Timer</code> class (henceforth just <code>Timer</code>) and distill it to its fundamentals. I want to answer:</p>
+<p>We want to study the <code>java.util.Timer</code> scheduler and strip it to its bare fundamentals. We want to know:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>How does it essentially work?</p>
+<p>How does it work?</p>
 </li>
 <li>
 <p>What concurrency mechanisms does it use?</p>
@@ -214,7 +214,8 @@
 </ul>
 </div>
 <div class="paragraph">
-<p>Yes. You can definitely roll out your own! Like all things concurrency, you shouldn&#8217;t use your own implementation in production, but actually being able to do develop one from scratch makes you feel incredibly competent, reduces the angst of using concepts like a black-box, and guides your judgement when you do use external code that deals with this for you.</p>
+<p>Yes. You can definitely roll out your own! Like all things concurrency, you shouldn&#8217;t use your own implementation in production, but learning to develop one from scratch is an enlightening and insightful experience.<br>
+Here you will learn low level concurrency primitives and concepts which are used by the external libraries in the java world that provide us high-level concepts like timers and task schedulers.</p>
 </div>
 </div>
 </div>
@@ -279,7 +280,7 @@
 </td>
 <td class="content">
 <div class="paragraph">
-<p>Since Java 5.0 (2004), <code>Timer</code> went out of favor with the introduction of <code>java.util.concurrent.ScheduledThreadPoolExecutor</code>. The latter is more versatile, but unless you need its extra-capabilities, <code>Timer</code> is more than adequate. For example, <code>ScheduledThreadPoolExecutor</code> is an interface rather than a concrete class, with all the advantages that brings.</p>
+<p>Since Java 5.0 (2004), <code>Timer</code> went out of favor with the introduction of <code>java.util.concurrent.ScheduledThreadPoolExecutor</code>. The latter is more versatile and also better designed, but <code>Timer</code> is more than adequate. For example, <code>ScheduledThreadPoolExecutor</code> is an interface rather than a concrete class, with all the advantages that brings.</p>
 </div>
 </td>
 </tr>
@@ -291,7 +292,7 @@
 <div class="sect3">
 <h4 id="_the_api"><a class="anchor" href="#_the_api"></a>The API</h4>
 <div class="paragraph">
-<p>There are 4 public methods.</p>
+<p>There are four public methods on the java&#8217;s <code>Timer</code> class.</p>
 </div>
 <div id="timerApi" class="exampleblock">
 <div class="title">Example 1. Timer API</div>
@@ -313,10 +314,13 @@
 </div>
 <div class="paragraph">
 <p>The two methods with the <code>period</code> argument are for <strong>periodic</strong> tasks. They are meant to run "an infinite number of times" at a frequency of <code>period</code>. The difference between the two is briefly addressed towards the end of the article.<br>
-We will focus on the first method. It&#8217;s the simplest, and requires us to address the fundamentals of the challenge that underpins timers: How to schedule the tasks.  It&#8217;s here where we lift the veil of magic. The other two scheduling methods introduce no fundamental new challenge and can be regarded as afterthoughts which we will overlook. <code>cancel()</code> is also important.</p>
+We will focus on the first method. It&#8217;s the simplest, but still requiring us to address the fundamentals of the challenge that underpins timers: How to schedule the tasks.  It&#8217;s here where we lift the veil of magic. The other two scheduling methods introduce no fundamental new challenge and can be regarded as afterthoughts which we will overlook. <code>cancel()</code> is also important.</p>
 </div>
 <div class="paragraph">
 <p>On listing <a href="#timerApi">Timer API</a>, <code>TimerTask</code> is a class which exists for the purpose of <code>Timer</code>. It is defined on the same file as well. It extends, and is essentially, a <code>Runnable</code>. It&#8217;s not overly relevant to the core understanding so we will just use <code>Runnable</code> on our case.</p>
+</div>
+<div class="paragraph">
+<p>Keep in mind that whenever we refer to <code>Timer</code> we mean the actual java class <code>java.util.Timer</code>.</p>
 </div>
 </div>
 </div>
@@ -350,7 +354,7 @@ In the code snippets that follow, we will use Scala. Scala syntax is slightly di
 </ol>
 </div>
 <div class="paragraph">
-<p>We don&#8217;t want to have to <em>initialize</em> the timer. Once an object is created, we want it to be immediately ready to receive tasks. This means the timer&#8217;s thread will have to be created and started on the constructor call. We should pause to consider the significance of this. Even though from the point of view of the client, constructing a timer looks just like any other call, underneath it is a point where the code becomes concurrent. After that point, two threads, with their own stack, are active doing their "own thing" and being scheduled on the actual physical processor. They communicate only via main memory.</p>
+<p>We don&#8217;t want to have to <em>initialize</em> the timer. Once an object is created, we want it to be immediately ready to receive tasks. This means the timer&#8217;s thread will have to be created and started on the constructor call. We should pause to consider the significance of this. Even though from the point of view of the client constructing a timer looks just like any other call, underneath it is a point where the code becomes concurrent. After that point, two threads, with their own stack, are active doing their "own thing" and being scheduled on the actual physical processor. They communicate only via main memory.</p>
 </div>
 <details id="naiveApproach">
 <summary class="title">Attempt 1 - Naive approach</summary>
@@ -390,11 +394,14 @@ object CustomTimer {
 </div>
 </details>
 <div class="paragraph">
-<p>The first approach <a href="#naiveApproach">above</a> will leverage the existing <code>LinkedBlockingQueue</code> class. Developing a thread safe data structure from scratch is very educational in what regards to concurrency - which is what we want to learn - but here we will delegate that particular job so that we can focus on the other concurrency intricacies of a <code>Timer</code>. I will still consider that the custom timer was built "from scratch".</p>
+<p>The first approach <a href="#naiveApproach">above</a> will leverage the existing <code>LinkedBlockingQueue</code> class. Developing a thread safe data structure from scratch is very educational in what regards to concurrency - which is what we want to learn - but here we will delegate that particular job so that we can focus on the other concurrency intricacies of a build a custom timer/scheduler. I will still consider that the custom timer was built "from scratch".</p>
 </div>
 <div class="paragraph">
-<p>The listing <a href="#naiveApproach">above</a> is quite straightforward. The timer thread loops around forever. On each iteration it takes one task from the shared queue, and if that tasks' time is up, it runs it. The client threads is even simpler. It is just a thin wrapper to inserting tasks onto the same shared queue.<br>
-Are you surprised of the usage of <code>System.currentTimeMillis()</code> to help schedule the tasks? Don&#8217;t be. <code>Timer</code> uses the exact same mechanism.</p>
+<p>The listing <a href="#naiveApproach">Attempt 1 - Naive approach</a> is quite straightforward. The timer thread loops around forever. On each iteration it takes one task from the shared queue, and if that tasks' time is up, it runs it. The client threads' code path (i.e., the <code>schedule</code> method) is even simpler. It is just a thin wrapper to inserting tasks onto the same shared queue.</p>
+</div>
+<div class="paragraph">
+<p>Are you surprised of the usage of <code>System.currentTimeMillis()</code> to help schedule the tasks? Don&#8217;t be. <code>Timer</code> uses the exact same mechanism to determine when a task needs to run.<br>
+This actually makes both <code>Timer</code> and our custom timer sensitive to the user changes of the system time. That is, if you schedule a task to run 1 hour from now, and then you change the clock back 1 year, the task will take 1 year and 1 hour to start running. Some consider this a "tiny" bug, others a feature. In contrast, the <code>ScheduledThreadPoolExecutor</code> uses <code>System.nanoTime()</code> that does not suffer from this.</p>
 </div>
 <div class="paragraph">
 <p>For all its cons, an advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread calling <code>queue.take</code> on a "waiting" state until a timer client pushes a new element/task to the queue.</p>
