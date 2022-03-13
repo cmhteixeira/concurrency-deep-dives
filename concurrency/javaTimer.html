@@ -404,7 +404,7 @@ object CustomTimer {
 This actually makes both <code>Timer</code> and our custom timer sensitive to the user changes of the system time. That is, if you schedule a task to run 1 hour from now, and then you change the clock back 1 year, the task will take 1 year and 1 hour to start running. Some consider this a "tiny" bug, others a feature. In contrast, the <code>ScheduledThreadPoolExecutor</code> uses <code>System.nanoTime()</code> that does not suffer from this.</p>
 </div>
 <div class="paragraph">
-<p>For all its cons, an advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is a nice advantage of using a blocking queue, which puts the thread calling <code>queue.take</code> on a "waiting" state until a timer client pushes a new element/task to the queue.</p>
+<p>For all its cons, an advantage of this approach is that the thread will not waste CPU time when there are no tasks submitted. This is provided by blocking queue, which puts the thread calling <code>queue.take</code> on a "waiting" state until a timer client pushes a new element/task to the queue.</p>
 </div>
 <div class="paragraph">
 <p>We can see that by profiling the thread state:</p>
@@ -462,7 +462,7 @@ object SomeTests extends App {
 <div class="content">
 <img src="_images/TimerThreadLane-Attempt1.svg" alt="TimerThreadLane Attempt1">
 </div>
-<div class="title">Figure 2. States of the timer thread for the listing <a href="#threadSleepsWhenQueueEmpty">above</a>. No tasks on the queue, means the thread will be in a waiting state, whereby the CPU will not run it.</div>
+<div class="title">Figure 2. States of the timer thread for the listing <a href="#threadSleepsWhenQueueEmpty">Thread "sleeps" when queue is empty</a>. No tasks on the queue, means the thread will be in a waiting state, whereby the CPU will not run it.</div>
 </div>
 <div class="paragraph">
 <p>The biggest disadvantage of this attempt is that when there are pending tasks (i.e. the queue is not empty) the timer thread is needlessly active. The thread will be assigned CPU time, although nothing  of value is running until the next task has to be run: If you submit a single task to run 30 minutes from now, for the next 30 minutes, the thread will be continuously looping around.</p>
@@ -612,7 +612,7 @@ object SomeTests extends App {
 <div class="title">Figure 4. States of the timer thread of a <code>java.util.Timer</code> for the listing <a href="#submitNewTaskWhenThreadIsWaitingForAnother">Submitting a task due sooner</a>.</div>
 </div>
 <div class="paragraph">
-<p>But wait, there is more. Notice the dashed line at 60 seconds, when Task 3 is introduced? If we were to zoom-in, we would notice that the thread wakes up for a very brief period of time, in the order of microseconds. This is necessary off course to verify when the new Task 3 has to be run and take appropriate action.</p>
+<p>Furthermore, notice the dashed line at 60 seconds, when Task 3 is introduced? If we were to zoom-in, we would notice that the thread wakes up for a very brief period of time, in the order of microseconds. This is necessary off course to verify when the new Task 3 has to be run and take appropriate action.</p>
 </div>
 <div class="paragraph">
 <p>This seems rather magical. The timer thread, which is effectively not running when Task 3 is submitted, wakes up as a result of the submission and then 1) processes the new task, 2) understands it should run earlier than Task 2, and then 3) goes back to sleep until its <span class="underline">new</span> due date.</p>
@@ -628,30 +628,30 @@ object SomeTests extends App {
 </div>
 </div>
 <div class="paragraph">
-<p>Solving the problem requires us to use low level concepts. The same concepts that external libraries, like the akka project, use to build higher-level abstractions for concurrency.<br>
-And this is in fact the point. We want to explore the most basic concurrency building blocks in Java. The building blocks that all other libraries, no matter how cool they are at the moment, must ultimately use. We want to know what they know.</p>
+<p>Solving the problem requires us to use low level concepts. The same concepts that external libraries that provide us with higher-level abstractions for concurrency, like for example the akka project, use.<br>
+And this is in fact the point. We want to explore the most basic concurrency building blocks in Java. The building blocks that all other libraries, no matter how esoteric, must ultimately use. We want to know what they know.</p>
 </div>
 <div class="paragraph">
 <p>It is here that we meet the interface between our source code (be it Java/Scala/Kotlin) and the underlying system (JVM, OS, Hardware) occurs.<br>
-The same way you ultimately need the JVM to have native code to handle the file system, or network calls for us, here we must also rely on the JVM to be able to do deal with thread scheduling.<br>
+The same way you ultimately need the JVM to have native code to handle the file system, or network calls for us, here we must also rely on the JVM to be able to deal with thread scheduling.<br>
 In turn, the JVM will call the underlying OS for this, give that threads is a concept of the OS.</p>
 </div>
 <div class="paragraph">
-<p>What is exposed by the JVM is the concept of the native methods <code>wait()</code>, <code>wait(&lt;timeout&gt;)</code>, <code>notify()</code>, and <code>notifyAll()</code>. These methods work alongside and are strictly associated with intrinsic locks. These are also called java monitors. The usage of <code>synchronized</code> keyword.<br>
-Most likely, some readers are already familiar with these.They exist on every Java object, and are the bedrock to for all concurrent things on the JVM (todo mention atomics).</p>
+<p>What is exposed by the JVM is the concept of the native methods <code>wait()</code>, <code>wait(&lt;timeout&gt;)</code>, <code>notify()</code>, and <code>notifyAll()</code>. These methods work alongside and are strictly associated with intrinsic locks. These are also called java monitors and  <code>synchronized</code> blocks.<br>
+Most likely, some readers are already familiar with these.They exist on every Java object, and are one of the pillars of all things concurrency in Java. The other pillar being atomics.</p>
 </div>
 <div class="paragraph">
-<p>We won&#8217;t be exploring these methods in detail. That requires an article of its own. A refreshner is important.</p>
+<p>We won&#8217;t be exploring these methods in detail. That requires an article of its own. But a summary is important.</p>
 </div>
 <div class="paragraph">
-<p>The most important method is <code>synchronized</code>. Synchronized is the syntax to implement java monitors (or intrinsic locks). This is essentially the java version of a mutex. The relevant part is that only a thread can have the monitor for a given object at a given time.<br>
-Equally important. The <code>wait()</code> and <code>notify()</code> methods above exist within the context of a monitor! Not outside. Meaning, calling those methods can only occur with the monitor held. Any other behaviour throws an exception.<br>
-Also, when the thread holding the monitor of an onject calls <code>&lt;Object&gt;.wait()</code> (<code>&lt;Object&gt;.wait(&lt;timeout&gt;)</code>), the thread <strong>releases</strong> the monitor and goes to sleep. IN other words the OS will not run it on CPU. The thread is only waken when another thread calls <code>notify()</code> on the same obejct, or the timeout expires.<br>
-Similarly, when a client calls <code>notify()</code>, the thread releases the monitor, and it awakes one thread that is waiting.<br>
-Again, for both methods, the thread must have already adquired the monitor. Meaning those calls are normally inside <code>syncrhonized</code> blocks.</p>
+<p>The most important method/keyword is <code>synchronized</code>. Synchronized is the syntax to implement java monitors (or intrinsic locks). This is essentially the java version of a mutex. Any and all Java objects, even the ones associated with your own classes, have this method. Any block of code within a <code>synchronized</code> statement is guaranteed to be accessed at most by one thread at a given time. Meaning, no two threads can be "inside" that code simultaneously. We say that only a given thread can have the monitor for a given object at a given time.<br>
+Equally important. The <code>wait()</code> and <code>notify()</code> methods above exist within the context of a <span class="underline">particular</span> monitor. Not outside. Meaning, calling those methods can only occur with the monitor held. Any other behaviour throws an exception.<br>
+When the thread holding the monitor of an object calls <code>wait()</code> (or <code>wait(&lt;timeout&gt;)</code>), the thread <strong>releases</strong> the monitor and goes to a waiting state. In this state, the OS will not give CPU cycles for it to run. The thread is only awaken when another thread calls <code>notify()</code> on the same object, or the timeout expires.<br>
+Similarly, calling <code>notify()</code> can only be done when the thread is holding the monitor of the same object. This method then releases the monitor, and it awakes one thread that is waiting. If there are many waiting on that monitor, "it selects" one thread at random.<br>
+Again, for both methods, the thread must have already acquired the monitor. Meaning those calls are normally inside <code>synchronized</code> blocks.</p>
 </div>
 <div class="paragraph">
-<p>With them, I am able to meet the requirement above.</p>
+<p>With them, we are able to meet the requirement above.</p>
 </div>
 <details id="firstSeriousSolution">
 <summary class="title">A serious solution</summary>
@@ -725,7 +725,7 @@ object CustomTimer {
 <p>The <code>lock</code> object serves only the purpose of being the monitor for the <code>synchronized</code>/<code>wait</code>/<code>notify</code> calls. Obviously the actual name of the variable is not important. Since these methods are available on any and all java objects, the most appropriate object is simply <code>new Object()</code>.</p>
 </div>
 <div class="paragraph">
-<p><code>Timer</code> also leverages the same essential mechanism and the <code>synchronized</code>/<code>wait</code>/<code>notify</code> tryad to schedule tasks. However, it doesn&#8217;t use a separate object to act as the monitor. Instead, it uses the queue itself. In other words they don&#8217;t strictly separate the responsibility of the data structure from the scheduling part. It works for them becuase they use a queue sepcial made for the timer. IN our case, as we use an external queue, we don&#8217;t want to call synchronize methods on it. That would make thinkgs harder to understand, and more importatnly, it would increase contention on our queue. Also, why use an external queue to which we delegate thread safety, if we then end up using explicit external locking (via syncrhonize) ?</p>
+<p><code>Timer</code> also leverages the same essential mechanism and the <code>synchronized</code>/<code>wait</code>/<code>notify</code> tryad to schedule tasks. However, it doesn&#8217;t use a separate object to act as the monitor. Instead, it uses the queue itself. In other words they don&#8217;t strictly separate the responsibility of the data structure from the scheduling part. It works for them becuase they use a queue sepcial made for the timer. IN our case, as we use an external queue, we don&#8217;t want to call synchronize methods on it. That would make thinkgs harder to understand, and more importantly, it would increase contention on our queue. Also, why use an external queue to which we delegate thread safety, if we then end up using explicit external locking (via syncrhonize) ?</p>
 </div>
 <div class="paragraph">
 <p>On listing <a href="#firstSeriousSolution">A serious solution</a>, the <code>lock.notify()</code> and <code>lock.wait(&lt;timeout&gt;)</code> calls should be analyzed together. They perform a sort of dance.<br>
@@ -1308,7 +1308,7 @@ These two concepts are <strong>not</strong> equivalent in the scenario where the
 <h3 id="_exceptions_destroy_the_timer"><a class="anchor" href="#_exceptions_destroy_the_timer"></a>Exceptions destroy the timer</h3>
 <div class="paragraph">
 <p>When a task being executed by <code>Timer</code> throws an exception, the thread dies, and the <code>Timer</code> itself behaves as if it had been cancelled; meaning no more tasks can be scheduled. In contrast, <code>ScheduledThreadPoolExecutor</code> takes a more defensive approach, and is able to recuperate and continue running normally.<br>
-On our <a href="#cancellationFirstAttempt">current solution</a>, given that there is no <code>try/catch</code> block in sight, it&#8217;s clear that our thread will exit as well. Our offense is that we have no mechanism to stop any further task submissions. Less concerning, but also bad, is the fact the we don&#8217;t remove the tasks on the queue; these will never be run, and are obsolete references. Let&#8217;s add the last improvements in:</p>
+On our <a href="#cancellationFirstAttempt">current solution</a>, given that there is no <code>try/catch</code> block in sight, it&#8217;s clear that our thread will exit as well. Our offense is that we have no mechanism to stop any further task submissions. Less concerning, but also bad, is the fact that we don&#8217;t remove the tasks on the queue; these will never be run, and are obsolete references.</p>
 </div>
 </div>
 </div>
