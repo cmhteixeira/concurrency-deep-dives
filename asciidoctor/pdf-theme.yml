@@ -1,0 +1,28 @@
+extends: default-with-fallback-font
+header:
+#  background-image: image:../supplemental-ui/img/favicon.svg[fit=contain,link=https://cmhteixeira.com/concurrency]
+  margin: 0.2in
+  height: $base_line_height_length * 2.0
+  line_height: 1
+  padding: [ $base_line_height_length / 2, 1, 0, 1 ]
+  vertical_align: top
+  border_color: DDDDDD
+  border_width: 0.25
+  verso:
+#    left:
+#      content: image:../supplemental-ui/img/favicon.svg[align=top,osition=top,fit=contain,link=https://cmhteixeira.com/concurrency]
+    left:
+      content: |
+        {doctitle} | https://cmhteixeira.com/concurrency[Concurrency Deep Dives]
+    right:
+      content: by @cmhteixeira
+  recto:
+    left:
+      content: $header_verso_left_content
+#    center:
+#      content: $header_verso_center_content
+    right:
+      content: $header_verso_right_content
+
+# This is the necessary command.
+#  asciidoctor-pdf -b html5 modules/ROOT/pages/javaTimer.adoc -B modules/ROOT/images/ -a scripts=cjk -a pdf-theme=asciidoctor/pdf-theme.yml
