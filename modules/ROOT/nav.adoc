@@ -2,6 +2,16 @@
 ** xref:javaTimer.adoc[]
 ** Hierarchical timer wheels 🚧
 
+* Lower level concepts
+** xref:semaphore.adoc[]
+** Mutexes and Conditional variables 🚧
+** Light switches 🚧
+** Barriers 🚧
+** Cyclic Barriers 🚧
+** Count-Down Latch 🚧
+** Futures and Promises 🚧
+** Lock Free Programming and CAS 🚧
+
 * Data structures 🚧
 ** To state management 🚧
 *** Concurrent Maps 🚧
@@ -9,17 +19,6 @@
 *** Treiber Stack 🚧
 *** Priority Queue 🚧
 *** FIFO queues 🚧
-
-
-* Lower level concepts 🚧
-** Mutexes and Conditional variables 🚧
-** Semaphores 🚧
-** Light switches 🚧
-** Barriers 🚧
-** Cyclic Barriers 🚧
-** Count-Down Latch 🚧
-** Futures and Promises 🚧
-** Lock Free Programming and CAS 🚧
 
 * Thread Pools 🚧
 ** Your average thread pool 🚧

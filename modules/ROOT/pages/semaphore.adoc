@@ -1,0 +1,768 @@
+= Semaphores
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:hardbreaks:
+
+Semaphores are a concept which is [.underline]#sufficient# to develop important low-level concepts, such as:
+
+* Readers Writers Lock
+* Producer Consumer pattern
+* Barriers
+* Cyclic Barriers
+
+The list is not exhaustive. Semaphores are a very general tool that can be applied to most problems that require some level of thread communication/synchronization.
+For example, the famous __Dining Philosophers Problem__ can be solved with Semaphores.
+
+==== Are Semaphores a primitive?
+
+A true master in software is able to write everything from scratch. Starting only with raw constructs or first principles. From dogmas. On that search to know how things work, we must stop somewhere, or soon enough we will be studying electronics and breadboards. From the point of view of software, a good point to stop and just accept dogmas is the point where your runtime delegates to the Operating System (OS) and system calls.
+
+So an important question is whether Semaphores are one of such first principles, or if they can be derived from other concepts still.
+Turns out, both.
+
+Conceptually you can build a Semaphore from a Mutex and associated Conditional Variable. This is what this post is mostly about.
+In that sense, these 2 would be the real primitives, which would be provided by the underlying operating system, and eventually made available by the runtime you are working with. For example, intrinsic locks in the JVM, also called monitors, or synchronized locks, use a POSIX Thread library call on Linux.
+However, some Operating Systems do provide Semaphores directly, so we could consider them a primitive. Even though sometimes they implement said Semaphore internally using a Mutex and a Conditional Variable as well.
+
+In principle, everything you can create with a Semaphore you can also create with a Mutex and a Conditional Variable. Semaphores are just an abstraction which is very general and applicable to solve many types of problems. Therefore it is advantageous to learn the "pattern" once and then apply it to many problems.
+So, even though those 4 low-level concepts above can be developed with Semaphores, they could also be developed with some combination of Mutexes and Conditional Variables.
+
+
+== Mutexes and Conditional Variables
+
+=== Mutexes
+
+In the rest of the article, we develop a Semaphore from a Mutex and a Conditional Variable. So first we need to have a better picture of these 2 core concepts.
+
+You cannot truly build Mutexes and Conditional Variables unless you are building an OS to begin with. You could build a spin-lock on your own using Atomics, but that is not considered a Mutex. Ultimately you need Operating System (OS) support. The OS implements these things, because Mutexes are deeply associated with Threads, which is an OS construct as well.
+
+However, we talk about Mutexes also within the context of languages like Java and Rust. These languages provide abstractions and "interfaces" that allow us to reason about these concepts supposedly without the need to know how they are implemented at a lower level. It's insightful though to know these will ultimately be mapped to an actual OS Mutex. In practise that is what happens, and it is important to understand that for context.
+In particular, in Linux, both Java's and Rust's mutexes use the POSIX Threads' library calls of a Mutex and Conditional variable beneath the covers. As we will see though, the Mutex presented by these languages is safer and more user-friendly than raw POSIX Mutexes.
+
+The most basic definition would be that a Mutex is an object/variable that you can share across threads, and that you can "lock" and also "unlock", such that:
+
+* Only a thread can ever have the Mutex locked.
+* If another thread attempts to lock the Mutex whilst some other "holds the lock", then the former thread will be put to sleep by the OS until the Mutex is available.
+
+The "put to sleep by the OS" part is quite relevant. During the "sleeping time", the OS makes sure not to assign actual CPU time for the thread. That's great news, as CPU time is a precious resource not to be wasted.
+This part here is fundamental: We need the help of the OS for the sleeping part! No way to get around this.
+
+The source code between a Mutex lock and unlock in the same Thread is referred to as the Critical Section. Different Threads that use the same Mutex might have different Critical Sections. Importantly though, the semantics above means that the critical sections across all threads are mutually exclusive. Only the thread currently holding the lock is able to be in its Critical Section, whilst the other thread's Critical Sections are guaranteed not to be simultaneously running.
+
+[source,pseudo-code]
+----
+mutex = new Mutex;
+
+// Thread 1
+lock_the_mutex(&mutex)
+fooBar()  // Critical section
+release_the_mutex(&mutex)
+
+// Thread 2
+lock_the_mutex(&mutex)
+bazQux()  // Critical section
+release_the_mutex(&mutex)
+----
+
+Although the Critical Sections can be completely unrelated, its assumed that they manipulate some shared data. Otherwise, there would be little reason to have a Mutex to begin with.
+ In fact, a Mutex is meant to protect data; and so a Mutex is linked with the data it protects. In POSIX, this association is not explicit. That is, you are free to use Mutexes any way you like, as it is shown above. However, higher level languages normally provide Mutexes which always encapsulate some data.
+For example, on Rust, a Mutex is always associated with data. it is parametrized by the type of data too:
+
+[source,rust]
+----
+pub struct Mutex<T: ?Sized> {}
+
+impl<T> Mutex<T> {
+    pub fn new(t: T) -> Mutex<T> {todo!()}
+}
+----
+
+The `t: T` in the constructor is guaranteed to only be accessible (for either reads or writes) by the Mutex that currently holds the lock (methods not shown). This is guaranteed by the language semantics itself. You cannot break this even if you wanted.
+
+In the JVM on the other hand, even though every object can be used as a Mutex, you can also access that object without acquiring the lock, which is dangerous. In other words, in Java, it is up to the programmer to use the concepts correctly.
+
+Another important point is the unlocking part of Mutex. In Pthreads, this must be done manually by the programmer. However, both in Rust and Java, the unlocking is done automatically, normally when the block of code that the Mutex lock starts ends.
+
+
+Lastly notice that in Pthreads, mutexes are locked and unlocked by calling a static function on the Mutex object. While in Java and Rust, the Mutex has methods that you can call.
+
+=== Conditional Variables
+
+* Mutexes have a purpose independently of condvars. That is, there are cases in which you just need a Mutex (or several) and no condvars are needed.
+* Condvars on the other hand only make sense when associated with a Mutex (and the data associated with the Mutex)
+* Mutexes and condvars are used together for other purposes than to build a Semaphore.
+
+An example of this is when a thread enters a Mutex, does some work to the protected data, but is unable to finish completly until some other thread does some other work. For that, the initial thread "signals" that it can't continue and "yields" itself. The other thread wakes up, and is able to continue the work of the first thread.
+
+A good example of this is a Mutex protecting access to a shared queue; if a thread has a Mutex of a queue of elements, and the queue is empty, it might deshceule iteself so that some other thread may insert new elements to the queue.
+Similarly, if the queue is meant to be bounded, then when inserting an element, the calling thread might block itself until after another (producer) thread is able to remove an element.
+
+
+.Mutex + ConditionalVar
+[#Semaphore]
+====
+[source,pseudo-code]
+----
+struct BlockingBoundedThreadSafeLIFOQueue<T> {
+  max_size: int
+  mutex: Mutex
+  condvar: ConditionalVariable
+  protected_vector: Vector<T>
+
+  // Methods
+
+  fn push(t: T) {
+    mutex.lock()
+    
+    while protected_vector.len() == max_size {
+        condvar.wait(mutex) // <1>
+    }
+    protected_vector.push(t)
+
+    if protected_vec.len() == 1 {
+        condvar.notify_all()
+        return ()
+    } else {
+       mutex.unlock()
+       return ()
+    }
+  }
+
+  fn pop(): T {
+    mutex.lock()
+
+    while protected_vector.len() == 0 {
+        condvar.wait(mutex) // <1>
+    }
+
+    let res = protected_vector.pop()
+
+    if protected_vector.len() == (max_size - 1) {
+      condvar.notify_all()
+      return res
+    } else {
+      mutex.unlock()
+      return res
+    }
+  }
+}
+----
+====
+<1> A conditional variable will always return with the mutex locked.
+
+
+A conditional variable will always return with the mutex locked.
+A mutex must always be locked when you wait on a conditional variable!
+Conditional variables are signaling mechanism! That is where the Semaphore gets its behaviour.
+
+Mutexes can be associated with more than 1 conditional variable. Normally, one Conditional Variable should be associated with a single *condition*. And each *condition* associated with only one Conditional Variable. This is a precatuion more than an imposed rule. Makes things simpler. Above, we actually should have had two conditional variables. One for the condition of the vector being empty, and a separate one for when the vector is empty. Because we shared, the program is likely less efficient, as sometimes the OS will be waking up threads whose condition is not yet ready. But, the program should still be correct in this particular case, if not less efficient. In other scenarios, using the same conditional variable for more than one condition leads to bugs. But again, this is advice, not required semantivs or imposed behaviour.
+
+Signaling a Conditional variable when there are no threads waiting should be fine. nothing happens.
+
+
+.Implementation in Rust
+[%collapsible]
+====
+[source,rust]
+----
+use std::sync::{Mutex, Condvar};
+use std::ops::DerefMut;
+
+pub struct BlockingVec<T> {
+    max_size: usize,
+    mutex: Mutex<Vec<T>>,
+    cond_var: Condvar,
+}
+
+impl<T> BlockingVec<T> {
+    pub fn new(max_size: usize) -> BlockingVec<T> {
+        BlockingVec {
+            max_size,
+            mutex: Mutex::new(vec![]),
+            cond_var: Condvar::new(),
+        }
+    }
+
+    pub fn push(&self, t: T) -> () {
+        let mut mutex_guard = self.mutex.lock().unwrap();
+        let mut protected_vec = mutex_guard.deref_mut();
+        while protected_vec.len() == self.max_size {
+            mutex_guard = self.cond_var.wait(mutex_guard).unwrap();
+            protected_vec = mutex_guard.deref_mut();
+        }
+        protected_vec.push(t);
+
+        if protected_vec.len() == 1 {
+            self.cond_var.notify_all();
+        }
+    }
+
+    pub fn pop(&self) -> T {
+        let mut mutex_guard = self.mutex.lock().unwrap();
+        let mut protected_vec = mutex_guard.deref_mut();
+        while protected_vec.len() == 0 {
+            mutex_guard = self.cond_var.wait(mutex_guard).unwrap();
+            protected_vec = mutex_guard.deref_mut();
+        }
+        let res = protected_vec.pop().unwrap();
+
+        if protected_vec.len() == (self.max_size - 1) {
+            self.cond_var.notify_all();
+        }
+
+        res
+    }
+}
+----
+====
+
+
+Mutexes and Conditional Variables expose to us programmers minimal control over the OS's scheduling decisions. One of the few places where we have a say.
+Through Mutexes, the OS guarantees it will not schedule other threads at the same time running that code. Through condvars, we are able to deschedule a thread altogether until a condition is met.
+
+
+Mutex.lock()
+// This entire piece of code is guaranteed to be executed by only a single thread at a time.
+Mutex.unlock()
+
+The various concepts of a Mutex different on what "runtime" you are working on. On POSIX (followed by Linux), you have the concept of threads, Mutexes, and Conditional Variables. These are in turn used by the JVM to build the java Mutex (called intrisinc lock, or monitor lock). We also have Mutexes in Rust.
+
+Mutexes in POSIX are less restrictive. They are not associated with data, and they can fail in various ways if you misusedthem. In higher level languages, fortunately it runtime provides you with versions of Mutexes such that it is harder, and sometimes impossible to screw up.
+
+For example, POSIX Mutexes are not re-entrant, whilst JVM monitor locks are. POSIX Mutexes are not  irreconcilable linked to data; Rust and JVM Mutexes are irreconcilable linked to data. You have to unlock a Mutex explicitly. JVM and Rust syntax is such that the Mutex is unlocked seamlessly by the runtime. Rust and Jvm Mutexes release the Mutex when the thread that held it prior exits unexpectedly. POSIX Mutexes don't do that.
+
+
+== What Semaphores are
+
+As said earlier, they are a mechanism for threads to communicate/signal each other.
+They are powerful, because with this small primitive you can solve a foray of concurrency problems.
+
+There are all sorts of metaphors to explain Semaphores.
+
+* It is an object that is shared amongst several threads.
+** No point of having a Semaphore and only 1 thread.
+** Note that threads are independent of each other.
+There is no way of each knowing what some other is doing.
+* Such object is initiated with an integer.
+* Such object has two methods:
+** 1. signal or increment
+** 2. wait or decrement
+* That integer represents the number of threads that at any given moment are capable of calling `decrement` **and not block**.
+** So the integer with which the Semaphore is initiated is often described as being the number of "permits", whereby if a thread wants to enter the Semaphore and there are no permits left, then it must wait/block, until some other thread releases said permit.
+** When a thread calls `increment()` and there are waiting threads, that is, threads that had previously called `decrement()` and blocked because there were no "permits", then one of those threads will "wake up" and be able to proceed, removing a permit in the process.
+
+
+=== My mental model
+
+You must develop your own mental models of a Semaphore. And that qill require you to understand deeply what it is. But I can share how I visualize it.
+
+When I have to be precise, I draw this:
+
+When I am thinking out loud, I normally imagine a conference room with a big oval shaped desk and evenly distributed chairs.
+People can come inside the room and stay for whatever length, but they must sit in a chair. When they leave, obviously the chair stays and there is a place available for some dude. If all the chairs are taken, additional people wanting to join must wait outside the room waiting for a person currently inside to vacate. If there is a chair empty and people waiting, one of these will eventually enter the room. Also, a person in this analogy is a individual thread which is aware of the conference room.
+The term "aware" is used to link with the idea that the thread holds a reference to the Semaphore object.
+I think this analogy is common.... But here is some extra part of the analogy which I don't think is ever mentioned and which WILL BE CRITICAL to understand the difference with Mutexes: Someone from outside the room, that is not currently waiting to enter the room, CAN FORCE, a person on a chair to vacate!!!
+
+== Start
+
+Examples are in Rust.
+In other languages, you will need to find what is the concept of Mutex and Conditional variable.
+For example, JVM languages (e.g., Java, Scala) have the concept of monitors that encapsulate both a Mutex and Conditional Variable.
+Every Java object can implicitly act as a monitor, and as a monitor/condvar pair.
+
+.Semaphore Structure
+[#Semaphore]
+====
+[source,rust]
+----
+use std::sync::{Condvar, Mutex};
+
+pub struct Semaphore {
+    mutex: Mutex<u16>,
+    cond_var: Condvar,
+}
+----
+====
+
+Without further adue:
+
+.Semaphore
+[#Semaphore_impl]
+====
+[source,rust]
+----
+use std::sync::{Condvar, Mutex};
+
+impl Semaphore {
+    pub fn new(initial_size: u16) -> Semaphore {
+        Semaphore {
+            Mutex: Mutex::new(initial_size),
+            cond_var: Condvar::new(),
+        }
+    }
+
+    pub fn decrement(&self) {
+        let mut guard = self.Mutex.lock().unwrap();
+
+        while *guard == 0 {
+            guard = self.cond_var.wait(guard).unwrap();
+        }
+        *guard -= 1;
+    }
+
+    pub fn increment(&self) {
+        let mut guard = self.Mutex.lock().unwrap();
+        *guard += 1;
+        self.cond_var.notify_one();
+    }
+}
+----
+====
+
+The important point to note is that a Conditional Variable is always associated with a particular Mutex. It is one of the few ways we, as users, can influence the behaviour of the OS scheduler. That is, of how the OS schedules threads. These 2 concepts exist in Rust, but they are low-level enough to be provided by the OS as well. For example, part of the Pthreads (POSIX threads) definition defines these 2 concepts.
+A Conditional Variable contains 2 main methods. `wait()` and `notify()`. Although sometimes they have different names. You can only call wait from a thread that currently holds the Mutex lock. Its an error otherwise. When you do that, the Operating System does two things (atomically): It releases the Mutex the thread holds, and puts the thread on a waiting state. The OS keeps a record (it is irrelevant to know how it does this), that the thread is waiting "on some condition" associated with that Mutex/condition variable.
+Importantly, the thread will no longer be scheduled. Which is a good thing. It will not waste CPU cycles.
+The idea here is that the thread yields itself because it cannot proceed further without some other thread helping out.
+With the Mutex unlocked, other threads that hold a reference to the Semaphore will be able to lock it. While inside it, that new thread might follow a code path that leads to another `condVar.wait()`. In this case, the same thing would happen.
+However, the thread can instead call `condVar.notify()`. Doing that does two things. Again atomically: 1) It releases the lock the current thread has on the Mutex, and 2) wakes up exactly one of the threads that are waiting on that Conditional Variable (on of those that had previously called `condVar.wait()`)
+Its the CondVar that enables the Semaphore to be a signaling mechanism between threads.
+
+
+
+
+The code is quite brief. It is equivalent to the official Semaphore implementation in Rust's standard library for versions <= 1.8. You can check it out here.
+
+Now, this implementation does not completely follow the definition put forward by Dijkstra (its creator). For Dijkstra, the number of threads waiting to acquire the Semaphore would be reflected by the negative value of the counter of the Semaphore. However, in the snippets above, the counter variable protected by the Mutex is never negative.
+
+For all purposes however, the above definition is a valid Semaphore. We could have a more complex solution that follows Dijkstra definition. The following is my own creation. I am confident it is correct, but... I would not dare use in production.
+
+.Supporting Structs
+[%collapsible]
+====
+[source,rust]
+----
+use std::sync::{Mutex, Condvar};
+
+struct State {
+    counter: i16,
+    passes: u16,
+}
+
+impl State {
+    fn new(counter: i16, passes: u16) -> State {
+        State {
+            counter,
+            passes,
+        }
+    }
+}
+
+pub struct Semaphore {
+    Mutex: Mutex<State>,
+    cond_var: Condvar,
+}
+----
+====
+
+.Implementation
+[%collapsible]
+====
+[source,rust]
+----
+use std::sync::{Mutex, Condvar};
+use std::ops::{Deref, DerefMut};
+
+impl Semaphore {
+    pub fn new(size: u16) -> Semaphore {
+        if size == 0 {
+            panic!("Semaphore size must be greater than 0.")
+        }
+        Semaphore {
+            Mutex: Mutex::new(State::new(size as i16, 0)),
+            cond_var: Condvar::new(),
+        }
+    }
+
+    pub fn decrement(&self) {
+        let mut Mutex_guard = self.Mutex.lock().unwrap();
+        let State { counter, .. } = Mutex_guard.deref_mut();
+        *counter -= 1;
+
+        if *counter < 0 {
+            while (*Mutex_guard.deref()).passes == 0 {
+                Mutex_guard = self.cond_var.wait(Mutex_guard).unwrap();
+            }
+            let State { passes, .. } = Mutex_guard.deref_mut();
+            *passes -= 1;
+        }
+    }
+
+    pub fn increment(&self) {
+        let mut Mutex_guard = self.Mutex.lock().unwrap();
+        let State { counter, passes } = Mutex_guard.deref_mut();
+        *counter += 1;
+
+        if *counter <= 0 {
+            *passes += 1;
+            self.cond_var.notify_one();
+        }
+    }
+}
+----
+====
+
+== Example
+
+Let's give an example of using Semaphores. I don't really want to describe the solution to other low-level contepts, like the "ReadWriteLock", as that deserves a post of its own. Instead lets solve a particular problem. This problem is adapted from "Allen B. Downey"'s "Little book of Semaphores":
+
+A company has set up a unisex bathroom on the new floor, with the following restrictions:
+
+- There can not be both men and women in the bathroom at the same time.
+- For productivity reasons, no more than 3 people can be in the bathroom.
+
+Your job is to come up with an algorithm and/or object that is able to coordinate access to the bathroom so that those invariants are maintained. It can be solved with Semaphores off course.
+
+Lets first decide on the API. This part is not really part of concurrency, but it gives context. It helps understand how the problem would this relates to real world ...
+
+
+.API
+[#Semaphore]
+====
+[source,rust]
+----
+pub struct Bathroom {}
+
+impl Bathroom {
+  pub fn access_woman<T>(&self, f: T) -> () where T: Fn(()) -> () {
+    todo!();  // what we need to implement
+  }
+
+  pub fn access_man<T>(&self, f: T) -> () where T: Fn(()) -> () {
+    todo!();  // what we need to implement
+  }
+}
+----
+====
+
+So that then we can:
+
+1. Create an instance of `Bathroom`.
+2. Share it amongst countless "woman threads" and "men threads".
+3. Be assured that all the synchronization is dealt internally by the API calls, and those clients don't need to do sync externally by themselves.
+
+On both calls a function `f` is passed which describes what actually should happen when that woman/man has access to the bathroom. This is represented from a function Unit => Unit.
+
+Nothing is stopping a woman thread from calling the `access_man()` instead. But this could be enforced by some other mechanism. That is not the point of this exercise.
+
+Nowm `access_woman()` should block if:
+1. There any men using the bathroom.
+2. If there are already 3 women using the bathroom.
+
+It should block until the bathroom is free again.
+
+In all other conditions it should enter the bathroom and execute the f function, returning after.
+
+The same for the men case.
+
+I was able to solve this scenario with 5 different Semaphores. Which sounds rather extreme. Allen Downey reached a similar solution.
+Think what the solution should look like. Tip: You should use Semaphores, but you don't need to use **only** Semaphores. You can have helper variables, if you ind that helpfull.
+I will use pseudo-code first, and then translate it to Rust and Java/Scala.
+
+.Warm up
+====
+[source,]
+----
+class Bathroom {
+  sem_w: Semaphore(3),
+  sem_m: Semaphore(3)
+}
+
+impl Bathroom {
+  fn access_woman(f: Unit => Unit) {
+    this.sem_w.increment()
+    f()
+    this.sem_w.decrement()
+  }
+
+  fn access_man(f: Unit => Unit) {
+    this.sem_m.increment()
+    f()
+    this.sem_m.increment()
+  }
+}
+----
+====
+
+Notice that the concept of "using the bathroom" is represented by running function `f`. In other words, whilst `f` is running, that thread/person that provided that `f` is using the bathroom.
+
+When the 4th woman arrives, the calling thread would block at `this.sem_w.increment()`, and would only proceed after some woman, currently inside, exited.
+The above would correctly prevent more than 3 women using the bathroom at the same time. The same for men. It would however allow for both men and woman to be in the bathroom.
+
+We need some kind of switch for the entire bathroom that represents if it is being used by women, men, or neither.
+If wouldn't have reached a solution on your own, do you want to try now?
+
+For that we need 3 extra Semaphores. We need a Semaphore(1) that controls the switch.
+The first woman/man to enter should acquire the Semaphore (turn the switch on). That would prevent a subsequent man/woman from entering. However, it would also prevent any other person from the same gender to enter; only 1 person would be allowrd in the bathroom at the same time. This would in theory satisfy our invariants, but would be cheating. We want 1, 2, or 3 women/men to be able to access simultenesouly.
+What we need is for the 1st woman/man to have to acquire the gender Semaphore **BUT** subsequente women shouldn't need. They should just verify the switch is already on, and proceed. Similarly, only the last woman to leave the bathroom should turn the switch back to the neutral position.
+To achieve this behaviour, that is, the first, and only the first, woman turning on the gender switch, and the last, and only the last woman to turn off the switch, we need an extra Semaphore(1). We also need some counter for the number of woman inside, so that we can know which one should turn the switch one and later which one should turn the switch off.
+Similarly for the men; this brings the total number of Semaphores to 5.
+
+
+.Warm up
+====
+[source,java]
+----
+class Bathroom {
+  sem_w: Semaphore(3),
+  sem_w_switch: Semaphore(1),
+  sem_m: Semaphore(3),
+  sem_m_switch: Semaphore(1),
+  sem_gender: Semaphore(1),
+  women_counter: u8,
+  men_counter: u8
+}
+
+impl Bathroom {
+  fn access_woman(f: Unit => Unit) {
+    this.sem_w.decrement()
+    this.sem_w_switch.decrement()
+      if (this.women_counter == 0)
+        this.sem_gender.decrement()
+      ++ women_counter
+    this.sem_w_switch.increment()
+    f() // finally using the bathroom
+    this.sem_w_switch.decrement()
+      if (this.women_counter == 1)
+        this.sem_gender.increment()
+      -- women_counter
+    this.sem_w_switch.increment()
+    this.sem_w.decrement()
+  }
+
+  fn access_man(f: Unit => Unit) {
+    this.sem_m.decrement()
+    this.sem_m_switch.decrement()
+      if (this.men_counter == 0)
+        this.sem_gender.decrement()
+      ++ men_counter
+    this.sem_m_switch.increment()
+    f() // finally using the bathroom
+    this.sem_m_switch.decrement()
+      if (this.men_counter == 1)
+        this.sem_gender.increment()
+      -- men_counter
+    this.sem_m_switch.increment()
+    this.sem_m.decrement()
+  }
+}
+----
+====
+
+And there you have it.
+Now you can create an instance of `Bathroom`, share it amongst several threads, and be confident that there will be adequate synchronization on the access.
+
+=== Lightswitch
+todo: maybe talk about it?
+
+
+== Semaphore(1) ≠ Mutex
+
+
+An important point is that Mutexes are different from "binary" Semaphores. They serve different purposes. It is often proclaimed that a Semaphore of count 1 (e.g. binary Semaphore) is equivalent to a Mutex. That is not true. Not completely so at least, as we <<_Semaphore1_Mutex, will see>>.
+
+They are similar, but not the same or interchangeable in most cases. The key difference is ownership.
+This is a misconception perpetuated by wiki pages, blog posts, and even text-books.
+When to use one over the other? Easy. If you are trying to protect data from being accessed by multiple threads simulteneously (and when one of those accesses is a write), then you want a Mutex. If you are trying to "signal" between threads use a Semaphore. Here signal means "communicate", or synchronize.
+A Mutex envisions the protection of data. Semaphores are used as a signaling mechanism between threads.
+
+=== Unlocking from the outside
+
+This is often misunderstood. Many smart people think this. But it is incorrect.
+The main difference is safety. A Semaphore of size 1 can be unlocked from another thread. This means that it opens up the possibility for misuse. A Mutex can only be unlocked from the thread that holds the lock.
+
+Lets give an example:
+
+
+====
+|====
+3+a|
+[source,]
+----
+sem = Semaphore(1)
+counter = 0 // shared variable
+----
+a|
+[source,]
+----
+Thread 1
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  sem.unlock()
+----
+a|
+[source,]
+----
+Thread 2
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  sem.unlock()
+----
+a|
+[source,]
+----
+Thread 3
+
+sem.unlock()
+thread.sleep(1.sec)
+sem.lock()
+----
+|====
+====
+
+The binary Semaphore is meant to protect the shared counter.
+If just for threads 1 and 2, after they run, the result of the shared counter should be 200. However, someone shared a reference of the Semaphore also to thread 3; this thread is unlocks the Semaphore, that will awake one of the waiting threads (thread 1 or 2), which will allow it to proceed and increment the counter at the same time as the other thread. As a consequence the final result of the counter will not be 200; at least not necessarily. Depending on how the OS interleaves the threads, and in which physical processors they run, the result will vary and be non-deterministic.
+This is true for 1) our custom Semaphore, and 2) java's standard library Semaphore.
+
+Whilst for Mutexes you simply cannot do that. Neither Rust nor Java provide you with an API to unlock a Mutex before you lock it. There is no unlock method. The unlocking is done automatically via the language itself, when the block of code that acquired the Mutex exits.
+
+In the literature, people say that Semaphores have no concept of ownership. Whist Mutexes do have.
+Mutexes are associated with data it protects. Whilst Semaphores aren't.
+
+We could however try in Pthreads.
+
+=== Deadlock through death
+
+====
+|====
+2+a|
+[source,]
+----
+sem = Semaphore(1)
+counter = 0 // shared variable
+----
+a|
+[source,]
+----
+Thread 1
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  if (i == 50)
+    throw Exception("kaboom")
+  sem.unlock()
+----
+a|
+[source,]
+----
+Thread 2
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  sem.unlock()
+----
+|====
+====
+
+This is a contrived example. In real life you might be calling external code (or even your own) while you are holding the Semaphore that throws, and you don't know ....
+Thread 2 will block foverer.
+This is something you have to take into account also when using Semaphores as Semaphores.
+
+This is a problem that does not affect Mutexes. In both Rust and Java, the second thread would not block forever.
+
+
+An example in Rust:
+
+.No deadlock due to exceptions
+====
+[source,rust]
+----
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::{JoinHandle, Thread};
+
+fn create_thread(Mutex: Arc<Mutex<u128>>, thread_name: String, max_iterations: u32) -> JoinHandle<()> {
+    thread::Builder::new().name(thread_name.clone())
+        .spawn(move || {
+            let mut thread_local_counter: u128 = 1;
+
+            while thread_local_counter <= max_iterations as u128 {
+                let mut Mutex_guard = Mutex.lock().expect("What the heck?! previous thread panicked!");
+                *Mutex_guard += 1;
+                if *Mutex_guard == 500 {
+                    panic!("kAbooM!!! from thread '{}'", thread_name);
+                }
+                thread_local_counter += 1;
+            }
+        }).unwrap()
+}
+
+fn main() {
+    let first_thread = create_thread(Mutex_1, String::from("One"), 5000);
+    let second_thread = create_thread(Mutex_2, String::from("Two"), 5000);
+
+    second_thread.join();
+    first_thread.join();
+
+    let final_value = Mutex_arc.lock().expect("Hey ... this failed");
+
+    println!("{}", final_value)
+}
+----
+====
+
+So here, if the thread that holds the Mutex lock throws an exception, the Mutex is releases, so the waiting threads do not starve. Furthermore, you the thread that wakes will be able to reconigze the thread that previously held the lock panicked, and take appropriate action. That appropriate action might be to throw as well.
+The same thing happens in Java.
+
+=== Recursive deadlock
+
+====
+|====
+2+a|
+[source,]
+----
+sem = Semaphore(1)
+counter = 0 // shared variable
+----
+a|
+[source,]
+----
+Thread 1
+
+fn times_two():
+  sem.lock()
+  counter = counter*2
+  se.unlock()
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  if (i == 50)
+    times_two()
+  sem.unlock()
+----
+a|
+[source,]
+----
+Thread 2
+
+for (i in 1..100):
+  sem.lock()
+  ++counter
+  sem.unlock()
+----
+|====
+====
+
+This is a contrived example. As the complexity of our code grows, even if we didn't intend it, we might get into the situation where our code path tries to lock the Semaphore when it already has it!
+Both will block.
+
+
+Off course some Operating systems might not have an implementation of Mutex that fixes the 3 problems above. However Java and Rust, do present and facade that addresses those issues.
+
+Here are some references I found on the difference:
